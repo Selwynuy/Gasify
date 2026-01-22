@@ -174,6 +174,64 @@ class SoundService {
     }
   }
 
+  /// Play success sound effect from asset file
+  Future<void> playSuccessSound() async {
+    if (!_isInitialized || _soundEffectsPlayer == null) {
+      return;
+    }
+    
+    if (!_settingsService.isSoundEffectsEnabled) {
+      return;
+    }
+
+    try {
+      // Load success sound from assets
+      final audioSource = AudioSource.asset('assets/Sounds/success.wav');
+      
+      // Set volume from settings
+      try {
+        await _soundEffectsPlayer!.setVolume(_settingsService.soundEffectsVolume);
+      } catch (e) {
+        debugPrint('Could not set sound effects volume: $e');
+      }
+      
+      // Play the success sound (don't loop)
+      await _soundEffectsPlayer!.setAudioSource(audioSource);
+      await _soundEffectsPlayer!.play();
+    } catch (e) {
+      debugPrint('Error playing success sound: $e');
+    }
+  }
+
+  /// Play fail sound effect from asset file
+  Future<void> playFailSound() async {
+    if (!_isInitialized || _soundEffectsPlayer == null) {
+      return;
+    }
+    
+    if (!_settingsService.isSoundEffectsEnabled) {
+      return;
+    }
+
+    try {
+      // Load fail sound from assets
+      final audioSource = AudioSource.asset('assets/Sounds/fail.wav');
+      
+      // Set volume from settings
+      try {
+        await _soundEffectsPlayer!.setVolume(_settingsService.soundEffectsVolume);
+      } catch (e) {
+        debugPrint('Could not set sound effects volume: $e');
+      }
+      
+      // Play the fail sound (don't loop)
+      await _soundEffectsPlayer!.setAudioSource(audioSource);
+      await _soundEffectsPlayer!.play();
+    } catch (e) {
+      debugPrint('Error playing fail sound: $e');
+    }
+  }
+
   /// Update volumes from settings
   Future<void> _updateVolumes() async {
     if (_backgroundPlayer != null) {

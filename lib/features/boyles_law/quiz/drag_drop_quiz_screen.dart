@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/sound_service.dart';
 
 /// Drag and Drop Quiz screen for Boyle's Law
 class DragDropQuizScreen extends StatefulWidget {
@@ -80,6 +81,15 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
     setState(() {
       _isSubmitted = true;
     });
+
+    // Play success or fail sound based on score
+    final score = _calculateScore();
+    final percentage = (score / 15) * 100;
+    if (percentage >= 70) {
+      SoundService().playSuccessSound();
+    } else {
+      SoundService().playFailSound();
+    }
   }
 
   void _onReset() {

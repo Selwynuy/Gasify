@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/services/sound_service.dart';
 
 /// Quiz question data
 class QuizQuestion {
@@ -40,6 +41,13 @@ class _QuizUnlockDialogState extends State<QuizUnlockDialog> {
       _isCorrect = _selectedAnswer == widget.question.correctAnswerIndex;
       _showResult = true;
     });
+
+    // Play success or fail sound
+    if (_isCorrect) {
+      SoundService().playSuccessSound();
+    } else {
+      SoundService().playFailSound();
+    }
   }
 
   void _proceed() {

@@ -757,12 +757,8 @@ class _CurvedO2Gauge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 80,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _CurvedGaugePainter(percentage: percentage),
-      ),
+    return CustomPaint(
+      painter: _CurvedGaugePainter(percentage: percentage),
     );
   }
 }
@@ -821,7 +817,7 @@ class _CurvedGaugePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
       
-      const redStartAngle = math.pi * 1.5;
+      const redStartAngle = math.pi * 0.5; // Start at top (90°), where yellow ends
       final redSweep = percentageSweep - math.pi * 0.5;
       if (redSweep > 0) {
         canvas.drawArc(rect, redStartAngle, redSweep, false, redPaint);

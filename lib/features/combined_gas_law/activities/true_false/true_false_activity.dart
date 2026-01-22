@@ -83,6 +83,14 @@ class _TrueFalseActivityState extends State<TrueFalseActivity> {
       _isSubmitted = true;
     });
     SoundService().playTouchSound();
+
+    // Play success or fail sound based on score
+    final percentage = (_score / _questions.length) * 100;
+    if (percentage >= 70) {
+      SoundService().playSuccessSound();
+    } else {
+      SoundService().playFailSound();
+    }
   }
 
   void _onReset() {
