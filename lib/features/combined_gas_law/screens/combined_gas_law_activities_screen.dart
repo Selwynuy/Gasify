@@ -42,7 +42,6 @@ class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitie
         MaterialPageRoute(builder: (context) => activityScreen),
       );
     } else {
-      // Show quiz dialog directly
       if (!mounted) return;
       final result = await showDialog<bool>(
         context: navigatorContext,
@@ -77,13 +76,11 @@ class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitie
         child: SafeArea(
           child: Column(
             children: [
-              // Top bar with icons
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Back button
                     IconButton(
                       icon: Container(
                         padding: const EdgeInsets.all(8),
@@ -110,7 +107,6 @@ class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitie
                         // TODO: Show info dialog
                       },
                     ),
-                    // Settings button
                     IconButton(
                       icon: Container(
                         padding: const EdgeInsets.all(8),
@@ -130,7 +126,6 @@ class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitie
                   ],
                 ),
               ),
-              // Title
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Container(
@@ -150,7 +145,6 @@ class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitie
                   ),
                 ),
               ),
-              // Main content
               Expanded(
                 child: Stack(
                   children: [

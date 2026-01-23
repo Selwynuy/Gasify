@@ -10,10 +10,13 @@ class SoundService {
 
   AudioPlayer? _backgroundPlayer;
   AudioPlayer? _soundEffectsPlayer;
+  AudioPlayer? _continuousSoundPlayer; // For looping sounds like syringe drag
+  AudioPlayer? _activityMusicPlayer; // For activity-specific background music (e.g., bubbles)
   final SettingsService _settingsService = SettingsService();
 
   bool _isInitialized = false;
   bool _isBackgroundMusicPlaying = false;
+  bool _isActivityMusicPlaying = false;
 
   /// Initialize the sound service
   Future<void> initialize() async {
@@ -25,6 +28,8 @@ class SoundService {
       // Create audio players for background music and sound effects
       _backgroundPlayer = AudioPlayer();
       _soundEffectsPlayer = AudioPlayer();
+      _continuousSoundPlayer = AudioPlayer();
+      _activityMusicPlayer = AudioPlayer();
       
       // Set background music to loop
       await _backgroundPlayer!.setLoopMode(LoopMode.one);
@@ -232,6 +237,141 @@ class SoundService {
     }
   }
 
+  /// Play boop sound effect from asset file
+  Future<void> playBoopSound() async {
+    if (!_isInitialized || _soundEffectsPlayer == null) {
+      return;
+    }
+    
+    if (!_settingsService.isSoundEffectsEnabled) {
+      return;
+    }
+
+    try {
+      // Load boop sound from assets
+      final audioSource = AudioSource.asset('assets/Sounds/boop.wav');
+      
+      // Set volume from settings
+      try {
+        await _soundEffectsPlayer!.setVolume(_settingsService.soundEffectsVolume);
+      } catch (e) {
+        debugPrint('Could not set sound effects volume: $e');
+      }
+      
+      // Play the boop sound (don't loop)
+      await _soundEffectsPlayer!.setAudioSource(audioSource);
+      await _soundEffectsPlayer!.play();
+    } catch (e) {
+      debugPrint('Error playing boop sound: $e');
+    }
+  }
+
+  /// Start playing syringe drag sound (looped)
+  Future<void> startSyringeDragSound() async {
+    if (!_isInitialized || _continuousSoundPlayer == null) {
+      return;
+    }
+    
+    if (!_settingsService.isSoundEffectsEnabled) {
+      return;
+    }
+
+    try {
+      // Stop any existing sound first
+      await _continuousSoundPlayer!.stop();
+      
+      // Load syringe drag sound from assets
+      final audioSource = AudioSource.asset('assets/Sounds/syringe_drag.wav');
+      
+      // Set volume from settings
+      try {
+        await _continuousSoundPlayer!.setVolume(_settingsService.soundEffectsVolume);
+      } catch (e) {
+        debugPrint('Could not set sound effects volume: $e');
+      }
+      
+      // Set to loop mode
+      await _continuousSoundPlayer!.setLoopMode(LoopMode.one);
+      
+      // Play the syringe drag sound (looped)
+      await _continuousSoundPlayer!.setAudioSource(audioSource);
+      await _continuousSoundPlayer!.play();
+    } catch (e) {
+      debugPrint('Error playing syringe drag sound: $e');
+    }
+  }
+
+  /// Stop playing syringe drag sound
+  Future<void> stopSyringeDragSound() async {
+    if (_continuousSoundPlayer == null) return;
+    try {
+      await _continuousSoundPlayer!.stop();
+    } catch (e) {
+      debugPrint('Error stopping syringe drag sound: $e');
+    }
+  }
+
+  /// Play bubbles background music (for scuba diving activity)
+  Future<void> playBubblesMusic() async {
+    if (!_isInitialized || _activityMusicPlayer == null) {
+      debugPrint('Sound service not initialized or activity music player is null');
+      return;
+    }
+    
+    if (!_settingsService.isMusicEnabled) {
+      debugPrint('Music is disabled in settings');
+      return;
+    }
+
+    // If already playing, don't restart
+    if (_isActivityMusicPlaying) {
+      debugPrint('Bubbles music already playing');
+      return;
+    }
+
+    try {
+      // Pause regular background music
+      await pauseBackgroundMusic();
+      
+      // Load bubbles music from assets
+      final audioSource = AudioSource.asset('assets/Sounds/bubbles.wav');
+      
+      await _activityMusicPlayer!.setLoopMode(LoopMode.one);
+      await _activityMusicPlayer!.setAudioSource(audioSource);
+      
+      // Set volume from settings
+      try {
+        await _activityMusicPlayer!.setVolume(_settingsService.musicVolume);
+      } catch (e) {
+        debugPrint('Could not set activity music volume: $e');
+      }
+      
+      await _activityMusicPlayer!.play();
+      _isActivityMusicPlaying = true;
+      debugPrint('Bubbles music started');
+    } catch (e) {
+      debugPrint('Error playing bubbles music: $e');
+      _isActivityMusicPlaying = false;
+    }
+  }
+
+  /// Stop bubbles background music and resume regular background music
+  Future<void> stopBubblesMusic() async {
+    if (_activityMusicPlayer == null) return;
+    try {
+      await _activityMusicPlayer!.stop();
+      _isActivityMusicPlaying = false;
+      debugPrint('Bubbles music stopped');
+      
+      // Resume regular background music if enabled
+      if (_settingsService.isMusicEnabled) {
+        await resumeBackgroundMusic();
+      }
+    } catch (e) {
+      debugPrint('Error stopping bubbles music: $e');
+    }
+  }
+
   /// Update volumes from settings
   Future<void> _updateVolumes() async {
     if (_backgroundPlayer != null) {
@@ -270,6 +410,13 @@ class SoundService {
       } catch (e) {
         // If setVolume doesn't exist, volume might be read-only
         debugPrint('Could not set volume: $e');
+      }
+    }
+    if (_activityMusicPlayer != null) {
+      try {
+        await _activityMusicPlayer!.setVolume(volume);
+      } catch (e) {
+        debugPrint('Could not set activity music volume: $e');
       }
     }
   }
@@ -311,11 +458,15 @@ class SoundService {
     try {
       await _backgroundPlayer?.dispose();
       await _soundEffectsPlayer?.dispose();
+      await _continuousSoundPlayer?.dispose();
+      await _activityMusicPlayer?.dispose();
     } catch (e) {
       debugPrint('Error disposing sound service: $e');
     }
     _backgroundPlayer = null;
     _soundEffectsPlayer = null;
+    _continuousSoundPlayer = null;
+    _activityMusicPlayer = null;
     _isInitialized = false;
   }
 }

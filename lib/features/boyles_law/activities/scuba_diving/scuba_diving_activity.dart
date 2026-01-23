@@ -6,6 +6,7 @@ import '../../../settings/screens/settings_screen.dart';
 import 'widgets/underwater_background.dart';
 import 'widgets/diver_widget.dart';
 import 'widgets/action_buttons.dart';
+import '../../../../core/services/sound_service.dart';
 
 /// Scuba diving Boyle's Law activity screen.
 /// Context: A recreational diver ascending quickly while holding breath.
@@ -33,7 +34,6 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
     return _warningFlashController!;
   }
 
-  // Graph data
   final List<Offset> _graphPoints = [];
 
 
@@ -43,7 +43,7 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
     super.initState();
     _state = DivingState(
       depthMeters: 10.0,
-      lungVolumeLiters: 3.0, // At 10m (2 ATA), lungs = 3L (from 6L at surface)
+      lungVolumeLiters: 3.0,
     );
 
     _controller = AnimationController(
@@ -63,10 +63,15 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
       });
 
     _addGraphPoint();
+    
+    // Start bubbles background music
+    SoundService().playBubblesMusic();
   }
 
   @override
   void dispose() {
+    // Stop bubbles music when leaving the activity
+    SoundService().stopBubblesMusic();
     _controller.dispose();
     _warningFlashController?.dispose();
     super.dispose();
@@ -91,7 +96,6 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
   }
 
   void _animateToDepthRapid(double newDepth) {
-    // For rapid updates (holding), use very short animation for smooth motion
     _targetDepth = newDepth;
     _controller.duration = const Duration(milliseconds: 100);
     _depthAnimation = Tween<double>(
@@ -111,11 +115,10 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
 
   void _onAscendSlowly() {
     setState(() {
-      _state.consumeOxygen(amount: 0.001); // Consume once per action
+      _state.consumeOxygen(amount: 0.5);
     });
     final newDepth = DivingPhysicsService.ascendDepthStep(_state.depthMeters);
     
-    // If animation is running (button being held), use rapid smooth animation
     if (_controller.isAnimating) {
       _animateToDepthRapid(newDepth);
     } else {
@@ -125,11 +128,10 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
 
   void _onDescend() {
     setState(() {
-      _state.consumeOxygen(amount: 0.001); // Consume once per action
+      _state.consumeOxygen(amount: 0.5);
     });
     final newDepth = DivingPhysicsService.descendDepthStep(_state.depthMeters);
     
-    // If animation is running (button being held), use rapid smooth animation
     if (_controller.isAnimating) {
       _animateToDepthRapid(newDepth);
     } else {
@@ -139,18 +141,15 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
 
   void _onEmergencyAscent() {
     setState(() {
-      _state.consumeOxygen(amount: 0.001); // Consume once per action
+      _state.consumeOxygen(amount: 1.0);
     });
     final newDepth = DivingPhysicsService.emergencyAscentDepth(_state.depthMeters);
     
-    // Show flashing warning
     setState(() {
       _showEmergencyWarning = true;
     });
-    // Start flashing animation
     _warningController.repeat(reverse: true);
     
-    // Hide warning after 4 seconds
     Future.delayed(const Duration(seconds: 4), () {
       if (mounted) {
         setState(() {
@@ -161,14 +160,13 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
       }
     });
     
-    // Emergency ascent is always a single dramatic action
     _animateToDepth(newDepth);
   }
 
   void _onExhale() {
     setState(() {
       _state.exhale(liters: 0.7);
-      _state.consumeOxygen(amount: 0.002); // 10x bigger capacity
+      _state.consumeOxygen(amount: 0.3);
       _addGraphPoint();
     });
   }
@@ -181,35 +179,27 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
   }
 
   void _resetActivity() {
-    // Stop any ongoing animation first
     _controller.stop();
     _controller.reset();
     
     setState(() {
-      // Reset to depth 10.0m (2.0 atm) with lung volume 3.0L
-      // At 10m depth, pressure is 2.0 atm
-      // At surface (1 ATA): lungs = 6L, so at 10m (2 ATA): lungs = 3L (Boyle's Law)
       _state = DivingState(
         depthMeters: 10.0,
         lungVolumeLiters: 3.0,
       );
       
-      // Manually ensure pressure matches depth (2.0 atm at 10m)
-      _state.pressureAtm = 1.0 + 10.0 / 10.0; // 2.0 atm
-      // Ensure lung volume is 3.0L at 10m
+      _state.pressureAtm = 1.0 + 10.0 / 10.0;
       _state.lungVolumeLiters = 3.0;
       
       _targetDepth = 10.0;
       _graphPoints.clear();
       
-      // Recreate animation with correct initial values (both start and end at 10.0m)
       _depthAnimation = Tween<double>(
         begin: 10.0,
         end: 10.0,
       ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut))
         ..addListener(() {
           setState(() {
-            // Only update if depth actually changes significantly
             if ((_depthAnimation.value - _state.depthMeters).abs() > 0.01) {
               _state.setDepth(_depthAnimation.value);
             }
@@ -217,7 +207,6 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
           });
         });
       
-      // Add initial graph point
       _addGraphPoint();
     });
   }
@@ -226,7 +215,6 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
 
   @override
   Widget build(BuildContext context) {
-    // Normalize lung volume: range is 2L (at 20m/3 ATA) to 6L (at surface/1 ATA)
     final double normalizedLungVolume =
         ((_state.lungVolumeLiters - 2.0) / (6.0 - 2.0)).clamp(0.0, 1.0);
 
@@ -287,10 +275,8 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Underwater background elements (coral, fish, etc.)
               const UnderwaterBackground(),
               
-              // Emergency warning - right side, below HUD
               if (_showEmergencyWarning)
                 Positioned(
                   top: 180,
@@ -359,23 +345,19 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                   ),
                 ),
               
-              // Main content
               Positioned.fill(
                 child: Column(
                   children: [
-                    // Top HUD panels
                     Padding(
                       padding: const EdgeInsets.all(12.0),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Left side - Two separate containers
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // Depth and Lung Volume container
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
@@ -407,7 +389,6 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                                   ),
                                 ),
                                 const SizedBox(height: 12),
-                                // O2 Tank gauge container - separate (scaled to 85%)
                                 Transform.scale(
                                   scale: 0.85,
                                   alignment: Alignment.topLeft,
@@ -445,7 +426,10 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                                         const SizedBox(height: 35),
                                         SizedBox(
                                           height: 35,
-                                          child: _CurvedO2Gauge(percentage: _state.oxygenTankPercent),
+                                          child: _CurvedO2Gauge(
+                                            key: ValueKey(_state.oxygenTankPercent),
+                                            percentage: _state.oxygenTankPercent,
+                                          ),
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
@@ -464,7 +448,6 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                             ),
                           ),
                           const SizedBox(width: 12),
-                          // Right side - Pressure vs Volume graph
                           Expanded(
                             child: SizedBox(
                               height: 150,
@@ -479,17 +462,14 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                       ),
                     ),
 
-                    // Center - Diver with lungs inside
                     Expanded(
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          // Diver widget
                           AnimatedBuilder(
                             animation: _controller,
                             builder: (context, child) {
-                              // Add subtle vertical movement based on depth change
-                              final depthOffset = (_state.depthMeters - 10.0) * 2.0; // Scale for visibility
+                              final depthOffset = (_state.depthMeters - 10.0) * 2.0;
                               return Transform.translate(
                                 offset: Offset(0, depthOffset),
                                 child: DiverWidget(
@@ -502,13 +482,11 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                       ),
                     ),
 
-                    // Bottom control buttons
                     Padding(
                       padding: const EdgeInsets.only(left: 12.0, right: 12.0, bottom: 12.0),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Action buttons
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                             children: [
@@ -532,7 +510,7 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                                   label: 'EMERGENCY ASCENT',
                                   onPressed: _onEmergencyAscent,
                                   color: Colors.lightBlue,
-                                  allowHold: false, // Single click only
+                                  allowHold: false,
                                 ),
                               ),
                             ],
@@ -705,7 +683,6 @@ class _GraphPainter extends CustomPainter {
       textPainter.paint(canvas, Offset(x - textPainter.width / 2, origin.dy + 4));
     }
 
-    // Draw the path line connecting all points
     if (points.length > 1) {
       final path = Path();
       bool isFirst = true;
@@ -714,7 +691,6 @@ class _GraphPainter extends CustomPainter {
         final x = origin.dx + (point.dx / maxVolume) * graphWidth;
         final y = origin.dy - (point.dy / maxPressure) * graphHeight;
 
-        // Clamp coordinates to graph bounds
         final clampedX = x.clamp(origin.dx, origin.dx + graphWidth);
         final clampedY = y.clamp(origin.dy - graphHeight, origin.dy);
 
@@ -726,7 +702,6 @@ class _GraphPainter extends CustomPainter {
         }
       }
       
-      // Draw the path with a thicker, more visible line
       final pathPaint = Paint()
         ..color = Colors.orange.shade600
         ..strokeWidth = 2.5
@@ -753,12 +728,17 @@ class _GraphPainter extends CustomPainter {
 class _CurvedO2Gauge extends StatelessWidget {
   final double percentage;
 
-  const _CurvedO2Gauge({required this.percentage});
+  _CurvedO2Gauge({super.key, required this.percentage});
 
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _CurvedGaugePainter(percentage: percentage),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return CustomPaint(
+          size: Size(constraints.maxWidth, constraints.maxHeight),
+          painter: _CurvedGaugePainter(percentage: percentage),
+        );
+      },
     );
   }
 }
@@ -771,10 +751,9 @@ class _CurvedGaugePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final centerX = size.width / 2;
-    final centerY = size.height - 5; // Position arc closer to bottom
-    final radius = size.width * 0.4; // Smaller radius for compact gauge
+    final centerY = size.height - 5;
+    final radius = size.width * 0.4;
     
-    // Draw the arc from left to right, curving upward (semicircle)
     final rect = Rect.fromLTWH(
       centerX - radius,
       centerY - radius,
@@ -782,11 +761,9 @@ class _CurvedGaugePainter extends CustomPainter {
       radius * 2,
     );
     
-    // Full arc path (180 degrees, from left to right, curving upward)
-    const startAngle = math.pi; // Start at left (180°)
-    const sweepAngle = math.pi; // Full semicircle to right (0°)
+    const startAngle = math.pi;
+    const sweepAngle = math.pi;
     
-    // Draw the background arc (dark gray) - thinner stroke
     final backgroundPaint = Paint()
       ..color = Colors.grey.shade800
       ..strokeWidth = 10
@@ -794,22 +771,23 @@ class _CurvedGaugePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(rect, startAngle, sweepAngle, false, backgroundPaint);
     
-    // Calculate the angle for the percentage (from left to right)
     final percentageSweep = (percentage / 100.0) * math.pi;
     
-    // Draw yellow portion (safe zone, left side - first 50%)
-    final yellowPaint = Paint()
-      ..color = Colors.yellow
-      ..strokeWidth = 10
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    
-    final yellowSweep = math.min(percentageSweep, math.pi * 0.5); // Yellow covers first 50%
-    if (yellowSweep > 0) {
-      canvas.drawArc(rect, startAngle, yellowSweep, false, yellowPaint);
+    // Draw yellow portion (0-50%) from left (180°) to top (90°)
+    if (percentage > 0) {
+      final yellowPaint = Paint()
+        ..color = Colors.yellow
+        ..strokeWidth = 10
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+      
+      final yellowSweep = math.min(percentageSweep, math.pi * 0.5);
+      if (yellowSweep > 0) {
+        canvas.drawArc(rect, startAngle, yellowSweep, false, yellowPaint);
+      }
     }
     
-    // Draw red portion (critical zone, right side - last 50%)
+    // Draw red portion (50-100%) from top (90°) to right (0°)
     if (percentage > 50) {
       final redPaint = Paint()
         ..color = Colors.red
@@ -817,14 +795,15 @@ class _CurvedGaugePainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round;
       
-      const redStartAngle = math.pi * 0.5; // Start at top (90°), where yellow ends
-      final redSweep = percentageSweep - math.pi * 0.5;
+      // Yellow goes from 180° (left) to 90° (top) = first 50%
+      // Red goes from 90° (top) to 0° (right) = second 50%
+      const redStartAngle = math.pi *1.5; // 90°, top
+      final redSweep = (percentageSweep - math.pi * 0.5).clamp(0.0, math.pi * 0.5);
       if (redSweep > 0) {
         canvas.drawArc(rect, redStartAngle, redSweep, false, redPaint);
       }
     }
     
-    // Draw indicator dot at current percentage position - smaller
     final indicatorAngle = startAngle - percentageSweep;
     final indicatorX = centerX + radius * math.cos(indicatorAngle);
     final indicatorY = centerY - radius * math.sin(indicatorAngle);
@@ -834,7 +813,6 @@ class _CurvedGaugePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawCircle(Offset(indicatorX, indicatorY), 5, indicatorPaint);
     
-    // Draw border around indicator
     final borderPaint = Paint()
       ..color = Colors.black
       ..style = PaintingStyle.stroke

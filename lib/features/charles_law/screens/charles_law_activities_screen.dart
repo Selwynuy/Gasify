@@ -46,7 +46,6 @@ class _CharlesLawActivitiesScreenState extends State<CharlesLawActivitiesScreen>
         MaterialPageRoute(builder: (context) => activityScreen),
       );
     } else {
-      // Show quiz dialog directly
       if (!mounted) return;
       final result = await showDialog<bool>(
         context: navigatorContext,
@@ -54,7 +53,6 @@ class _CharlesLawActivitiesScreenState extends State<CharlesLawActivitiesScreen>
           question: QuizQuestions.charlesLawQuestion,
           onUnlocked: () async {
             await ActivityUnlockService.unlockActivity(activityKey);
-            // Auto-unlock Drag and Drop Quiz when Rubber Boat is unlocked
             if (activityKey == 'charles_rubber_boat') {
               await ActivityUnlockService.unlockActivity('charles_quiz');
             }
@@ -85,13 +83,11 @@ class _CharlesLawActivitiesScreenState extends State<CharlesLawActivitiesScreen>
         child: SafeArea(
           child: Column(
             children: [
-              // Top bar with icons
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Back button
                     IconButton(
                       icon: Container(
                         padding: const EdgeInsets.all(8),
@@ -118,7 +114,6 @@ class _CharlesLawActivitiesScreenState extends State<CharlesLawActivitiesScreen>
                         // TODO: Show info dialog
                       },
                     ),
-                    // Settings button
                     IconButton(
                       icon: Container(
                         padding: const EdgeInsets.all(8),
@@ -138,7 +133,6 @@ class _CharlesLawActivitiesScreenState extends State<CharlesLawActivitiesScreen>
                   ],
                 ),
               ),
-              // Title
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Container(
@@ -158,7 +152,6 @@ class _CharlesLawActivitiesScreenState extends State<CharlesLawActivitiesScreen>
                   ),
                 ),
               ),
-              // Main content
               Expanded(
                 child: Stack(
                   children: [

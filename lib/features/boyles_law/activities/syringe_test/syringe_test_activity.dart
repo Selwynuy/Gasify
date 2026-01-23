@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
+import '../../../../core/services/sound_service.dart';
 
 class SyringeTestActivity extends StatefulWidget {
   const SyringeTestActivity({super.key});
@@ -68,6 +69,11 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
     super.dispose();
   }
 
+  void _onPlungerDragStart(DragStartDetails details) {
+    // Start syringe drag sound when dragging begins
+    SoundService().startSyringeDragSound();
+  }
+
   void _onPlungerDragUpdate(DragUpdateDetails details) {
     // Throttle updates to prevent excessive rebuilds
     final now = DateTime.now();
@@ -130,6 +136,9 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
 
   void _onPlungerDragEnd(DragEndDetails details) {
     _lastUpdateTime = null;
+    
+    // Stop syringe drag sound when dragging ends
+    SoundService().stopSyringeDragSound();
     
     if (!_isSealed && _balloonInSyringe && _balloonReleaseController != null) {
       final double currentSize = _balloonSize;
@@ -333,6 +342,7 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
                                 balloonInSyringe: _balloonInSyringe,
                                 balloonSize: _balloonSize,
                             isAtMaxPressure: _isAtMaxPressure,
+                                onPlungerDragStart: _onPlungerDragStart,
                                 onPlungerDrag: _onPlungerDragUpdate,
                                 onPlungerDragEnd: _onPlungerDragEnd,
                               ),
@@ -356,6 +366,10 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
                           left: _balloonPosition.dx,
                           top: _balloonPosition.dy,
                           child: GestureDetector(
+                            onTap: () {
+                              // Play boop sound when balloon is tapped
+                              SoundService().playBoopSound();
+                            },
                             onPanUpdate: (details) => _onBalloonDragUpdate(details, constraints),
                             onPanEnd: _onBalloonDragEnd,
                             child: const _BalloonWidget(size: Size(50, 60)),
@@ -436,6 +450,7 @@ class _VerticalSyringeWidget extends StatelessWidget {
   final bool balloonInSyringe;
   final double balloonSize;
   final bool isAtMaxPressure;
+  final Function(DragStartDetails) onPlungerDragStart;
   final Function(DragUpdateDetails) onPlungerDrag;
   final Function(DragEndDetails) onPlungerDragEnd;
 
@@ -445,6 +460,7 @@ class _VerticalSyringeWidget extends StatelessWidget {
     required this.balloonInSyringe,
     required this.balloonSize,
     required this.isAtMaxPressure,
+    required this.onPlungerDragStart,
     required this.onPlungerDrag,
     required this.onPlungerDragEnd,
   });
@@ -554,12 +570,18 @@ class _VerticalSyringeWidget extends StatelessWidget {
                     return AnimatedSize(
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
-                      child: SizedBox(
-                        width: clampedWidth,
-                        height: clampedHeight,
-                        child: _BalloonWidget(
-                          isAtMaxPressure: isAtMaxPressure,
-                          size: Size(clampedWidth, clampedHeight),
+                      child: GestureDetector(
+                        onTap: () {
+                          // Play boop sound when balloon is tapped
+                          SoundService().playBoopSound();
+                        },
+                        child: SizedBox(
+                          width: clampedWidth,
+                          height: clampedHeight,
+                          child: _BalloonWidget(
+                            isAtMaxPressure: isAtMaxPressure,
+                            size: Size(clampedWidth, clampedHeight),
+                          ),
                         ),
                       ),
                     );
@@ -572,6 +594,7 @@ class _VerticalSyringeWidget extends StatelessWidget {
             bottom: clampedPlungerHeadBottom,
             left: (constraints.maxWidth - outerBodyWidth) / 2,
             child: GestureDetector(
+              onVerticalDragStart: onPlungerDragStart,
               onVerticalDragUpdate: onPlungerDrag,
               onVerticalDragEnd: onPlungerDragEnd,
               child: SizedBox(

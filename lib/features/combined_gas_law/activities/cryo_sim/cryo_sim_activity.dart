@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -32,6 +33,14 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
   bool _sidebarOpen = false; // Toggle for sidebar
   int _currentStep = 0; // Current instruction step (0-5)
 
+  // Boom effect state
+  bool _isBooming = false;
+  late AnimationController _boomController;
+  late AnimationController _shakeController;
+  late Animation<double> _boomAnimation;
+  late Animation<double> _shakeAnimation;
+  static const double _boomThreshold = 500.0; // Kelvin - if T2 exceeds this, BOOM!
+
   // Slider ranges
   static const double _minPressure = 50.0;
   static const double _maxPressure = 500.0;
@@ -43,7 +52,39 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
   @override
   void initState() {
     super.initState();
+    
+    // Initialize boom animation controllers
+    _boomController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    
+    _boomAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _boomController, curve: Curves.easeOut),
+    );
+    
+    _shakeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _shakeController, curve: Curves.elasticOut),
+    );
+    
+    _boomController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _resetSimulation();
+      }
+    });
+    
     _calculateT2();
+  }
+
+  @override
+  void dispose() {
+    _boomController.dispose();
+    _shakeController.dispose();
+    super.dispose();
   }
 
   /// Calculate cooling intensity (0.0 = no cooling, 1.0 = maximum cooling)
@@ -74,6 +115,41 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
         // Don't set _showAnswer here - only show when button is clicked
       });
     }
+  }
+
+  /// Check for boom condition after showing answer
+  void _checkForBoom() {
+    if (_showAnswer && _t2Kelvin != null && _t2Kelvin! > _boomThreshold && !_isBooming) {
+      _triggerBoom();
+    }
+  }
+
+  /// Trigger the boom effect
+  void _triggerBoom() {
+    setState(() {
+      _isBooming = true;
+    });
+    SoundService().playTouchSound(); // Could add explosion sound here
+    _shakeController.forward();
+    _boomController.forward();
+  }
+
+  /// Reset simulation to initial state
+  void _resetSimulation() {
+    setState(() {
+      _p1 = 450.0;
+      _v1 = 0.050;
+      _t1Celsius = 30.0;
+      _p2 = 120.0;
+      _v2 = 0.150;
+      _t2Kelvin = null;
+      _showAnswer = false;
+      _currentStep = 0;
+      _isBooming = false;
+    });
+    _boomController.reset();
+    _shakeController.reset();
+    _calculateT2();
   }
 
   /// Get P-V diagram data points
@@ -197,17 +273,31 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
       body: SafeArea(
         child: Stack(
           children: [
-            // Main content area (full width) - Refrigerator only
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade800,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.cyan.shade700, width: 2),
-                ),
-                child: _buildRefrigeratorDiagram(),
-              ),
+            // Main content area (full width) - Refrigerator only (with shake effect)
+            AnimatedBuilder(
+              animation: _shakeAnimation,
+              builder: (context, child) {
+                final shakeOffset = _isBooming
+                    ? Offset(
+                        (0.5 - _shakeAnimation.value) * 20,
+                        (0.5 - _shakeAnimation.value) * 20,
+                      )
+                    : Offset.zero;
+                return Transform.translate(
+                  offset: shakeOffset,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade800,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.cyan.shade700, width: 2),
+                      ),
+                      child: _buildRefrigeratorDiagram(),
+                    ),
+                  ),
+                );
+              },
             ),
             // Initial State overlay (top left)
             Positioned(
@@ -340,6 +430,11 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
               bottom: 8,
               child: _buildInstructions(),
             ),
+            // Boom effect overlay
+            if (_isBooming)
+              Positioned.fill(
+                child: _buildBoomEffect(),
+              ),
           ],
         ),
       ),
@@ -763,6 +858,8 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
                 _calculateT2();
                 _showAnswer = true;
               });
+              // Check for boom after showing answer
+              _checkForBoom();
               SoundService().playTouchSound();
             },
             style: ElevatedButton.styleFrom(
@@ -947,6 +1044,149 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
         ],
       ),
     );
+  }
+
+  Widget _buildBoomEffect() {
+    return AnimatedBuilder(
+      animation: _boomAnimation,
+      builder: (context, child) {
+        final screenSize = MediaQuery.of(context).size;
+        final centerX = screenSize.width / 2;
+        final centerY = screenSize.height / 2;
+        
+        // Explosion radius grows with animation
+        final radius = _boomAnimation.value * screenSize.width * 0.8;
+        
+        // Opacity fades out
+        final opacity = (1.0 - _boomAnimation.value).clamp(0.0, 1.0);
+        
+        return CustomPaint(
+          painter: _BoomPainter(
+            center: Offset(centerX, centerY),
+            radius: radius,
+            opacity: opacity,
+            progress: _boomAnimation.value,
+          ),
+          child: Container(
+            color: Colors.transparent,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '💥 BOOM! 💥',
+                    style: TextStyle(
+                      fontSize: 60,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange.shade400.withValues(alpha: opacity),
+                      shadows: [
+                        Shadow(
+                          color: Colors.red.withValues(alpha: opacity),
+                          blurRadius: 20,
+                        ),
+                        Shadow(
+                          color: Colors.yellow.withValues(alpha: opacity),
+                          blurRadius: 30,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Temperature Too High!',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white.withValues(alpha: opacity),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Restarting simulation...',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.white70.withValues(alpha: opacity),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Custom painter for boom explosion effect
+class _BoomPainter extends CustomPainter {
+  final Offset center;
+  final double radius;
+  final double opacity;
+  final double progress;
+
+  _BoomPainter({
+    required this.center,
+    required this.radius,
+    required this.opacity,
+    required this.progress,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Draw multiple explosion rings
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+
+    // Outer ring (orange/red)
+    paint.color = Colors.orange.withValues(alpha: opacity * 0.6);
+    canvas.drawCircle(center, radius, paint);
+
+    // Middle ring (yellow)
+    paint.color = Colors.yellow.withValues(alpha: opacity * 0.8);
+    canvas.drawCircle(center, radius * 0.7, paint);
+
+    // Inner ring (white)
+    paint.color = Colors.white.withValues(alpha: opacity);
+    canvas.drawCircle(center, radius * 0.4, paint);
+
+    // Draw explosion particles
+    final particlePaint = Paint()
+      ..style = PaintingStyle.fill;
+
+    for (int i = 0; i < 20; i++) {
+      final angle = (i / 20) * 2 * math.pi;
+      final distance = radius * (0.5 + progress * 0.5);
+      final x = center.dx + distance * math.cos(angle);
+      final y = center.dy + distance * math.sin(angle);
+      
+      particlePaint.color = [
+        Colors.orange,
+        Colors.red,
+        Colors.yellow,
+        Colors.white,
+      ][i % 4].withValues(alpha: opacity);
+      
+      canvas.drawCircle(
+        Offset(x, y),
+        5 + progress * 10,
+        particlePaint,
+      );
+    }
+
+    // Draw background flash
+    final flashPaint = Paint()
+      ..style = PaintingStyle.fill
+      ..color = Colors.white.withValues(alpha: opacity * 0.3 * (1 - progress));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), flashPaint);
+  }
+
+  @override
+  bool shouldRepaint(_BoomPainter oldDelegate) {
+    return oldDelegate.radius != radius ||
+        oldDelegate.opacity != opacity ||
+        oldDelegate.progress != progress;
   }
 }
 

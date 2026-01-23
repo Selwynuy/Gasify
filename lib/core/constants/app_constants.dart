@@ -38,12 +38,5 @@ class AppConstants {
   static const double maxSyringeVolume = 60.0;
   static const double minSyringeVolume = 1.0;
   static const double maxBalloonPressure = 3.0;
-  
-  // Asset paths
-  static const String assetOceanBackground = 'assets/Ocean_Background.png';
-  static const String assetScubaDiver = 'assets/Scuba_Diver.png';
-  static const String assetLungs = 'assets/Lungs2.png';
-  static const String assetLungs2 = 'assets/Lungs2.png';
-  static const String assetHomeScreenBackground = 'assets/HomeScreen_Background.png';
 }
 
