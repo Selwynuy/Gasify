@@ -64,7 +64,7 @@ class _ScubaGasLawsAppState extends State<ScubaGasLawsApp> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Boyle\'s Law Lab',
+      title: 'GASIFY',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF99CAE8)),
@@ -99,6 +99,13 @@ class _TouchSoundWrapperState extends State<_TouchSoundWrapper> {
         _pointerDownPosition = event.position;
       },
       onPointerUp: (event) {
+        // Skip sound if this pointer is registered to skip wrapper sounds
+        if (SoundService.shouldSkipWrapperSound(event.pointer)) {
+          SoundService.unregisterSkipWrapperSound(event.pointer);
+          _pointerDownPosition = null;
+          return;
+        }
+        
         if (_pointerDownPosition != null) {
           final distance = (_pointerDownPosition! - event.position).distance;
           // Only play sound if it was a tap (not a drag)
@@ -108,7 +115,8 @@ class _TouchSoundWrapperState extends State<_TouchSoundWrapper> {
         }
         _pointerDownPosition = null;
       },
-      onPointerCancel: (_) {
+      onPointerCancel: (event) {
+        SoundService.unregisterSkipWrapperSound(event.pointer);
         _pointerDownPosition = null;
       },
       child: widget.child,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter/foundation.dart';
 import '../services/settings_service.dart';
@@ -17,6 +18,24 @@ class SoundService {
   bool _isInitialized = false;
   bool _isBackgroundMusicPlaying = false;
   bool _isActivityMusicPlaying = false;
+  
+  // Track pointer IDs that should skip wrapper touch sounds (e.g., ActionButtons)
+  static final Set<int> _skipWrapperSoundPointers = {};
+  
+  /// Register a pointer ID to skip wrapper touch sounds
+  static void registerSkipWrapperSound(int pointer) {
+    _skipWrapperSoundPointers.add(pointer);
+  }
+  
+  /// Unregister a pointer ID from skipping wrapper touch sounds
+  static void unregisterSkipWrapperSound(int pointer) {
+    _skipWrapperSoundPointers.remove(pointer);
+  }
+  
+  /// Check if a pointer ID should skip wrapper touch sounds
+  static bool shouldSkipWrapperSound(int pointer) {
+    return _skipWrapperSoundPointers.contains(pointer);
+  }
 
   /// Initialize the sound service
   Future<void> initialize() async {
@@ -266,6 +285,161 @@ class SoundService {
     }
   }
 
+  /// Play explosion sound effect from asset file
+  Future<void> playExplosionSound() async {
+    if (!_isInitialized || _soundEffectsPlayer == null) {
+      return;
+    }
+    
+    if (!_settingsService.isSoundEffectsEnabled) {
+      return;
+    }
+
+    try {
+      // Temporarily pause activity music to avoid conflicts
+      bool wasActivityMusicPlaying = false;
+      if (_isActivityMusicPlaying && _activityMusicPlayer != null) {
+        try {
+          await _activityMusicPlayer!.pause();
+          wasActivityMusicPlaying = true;
+        } catch (e) {
+          // Ignore errors when pausing
+        }
+      }
+      
+      // Stop and reset the player to ensure clean state
+      try {
+        await _soundEffectsPlayer!.stop();
+        // Small delay to ensure player is ready
+        await Future.delayed(const Duration(milliseconds: 100));
+      } catch (e) {
+        // Try to reset the player if stop failed
+        try {
+          await _soundEffectsPlayer!.seek(Duration.zero);
+        } catch (e2) {
+          // Ignore errors
+        }
+      }
+      
+      // Load explosion sound from assets
+      final audioSource = AudioSource.asset('assets/Sounds/explosion.mp3');
+      
+      // Set volume from settings first
+      try {
+        await _soundEffectsPlayer!.setVolume(_settingsService.soundEffectsVolume);
+      } catch (e) {
+        // Ignore volume errors
+      }
+      
+      // Set audio source and play
+      try {
+        await _soundEffectsPlayer!.setAudioSource(audioSource);
+        // Small delay to ensure source is loaded
+        await Future.delayed(const Duration(milliseconds: 100));
+        await _soundEffectsPlayer!.play();
+        
+        // Resume activity music after explosion sound finishes
+        if (wasActivityMusicPlaying && _activityMusicPlayer != null) {
+          // Listen for when explosion sound completes
+          StreamSubscription? subscription;
+          subscription = _soundEffectsPlayer!.playerStateStream.listen((state) {
+            if (state.processingState == ProcessingState.completed) {
+              _activityMusicPlayer!.play();
+              subscription?.cancel();
+            }
+          });
+          
+          // Fallback: resume after 2 seconds if stream doesn't fire
+          Future.delayed(const Duration(seconds: 2), () {
+            subscription?.cancel();
+            if (_activityMusicPlayer != null) {
+              _activityMusicPlayer!.play();
+            }
+          });
+        }
+      } catch (e) {
+        // Resume activity music if we failed
+        if (wasActivityMusicPlaying && _activityMusicPlayer != null) {
+          try {
+            await _activityMusicPlayer!.play();
+          } catch (e2) {
+            // Ignore errors
+          }
+        }
+        // Try to recreate the player if there's a persistent issue
+        try {
+          await _soundEffectsPlayer!.dispose();
+          _soundEffectsPlayer = AudioPlayer();
+          await _soundEffectsPlayer!.setVolume(_settingsService.soundEffectsVolume);
+          await _soundEffectsPlayer!.setAudioSource(audioSource);
+          await _soundEffectsPlayer!.play();
+        } catch (e2) {
+          // Ignore errors
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
+  /// Play pop sound effect from asset file
+  /// Note: If pop.aiff doesn't work, converts to pop.wav for better compatibility
+  Future<void> playPopSound() async {
+    if (!_isInitialized || _soundEffectsPlayer == null) {
+      return;
+    }
+    
+    if (!_settingsService.isSoundEffectsEnabled) {
+      return;
+    }
+
+    try {
+      // Stop any currently playing sound first
+      try {
+        await _soundEffectsPlayer!.stop();
+      } catch (e) {
+        // Ignore errors when stopping
+      }
+      
+      // Try pop.wav first (if you convert the file), then fallback to pop.aiff
+      String soundPath = 'assets/Sounds/pop.wav';
+      try {
+        final audioSource = AudioSource.asset(soundPath);
+        await _soundEffectsPlayer!.setVolume(_settingsService.soundEffectsVolume);
+        await _soundEffectsPlayer!.setAudioSource(audioSource);
+        await _soundEffectsPlayer!.play();
+        return;
+      } catch (e) {
+        debugPrint('pop.wav not found, trying pop.aiff: $e');
+        soundPath = 'assets/Sounds/pop.aiff';
+      }
+      
+      // Load pop sound from assets (try aiff if wav doesn't exist)
+      final audioSource = AudioSource.asset(soundPath);
+      
+      // Set volume from settings
+      try {
+        await _soundEffectsPlayer!.setVolume(_settingsService.soundEffectsVolume);
+      } catch (e) {
+        debugPrint('Could not set sound effects volume: $e');
+      }
+      
+      // Play the pop sound (don't loop)
+      await _soundEffectsPlayer!.setAudioSource(audioSource);
+      await _soundEffectsPlayer!.play();
+    } catch (e) {
+      debugPrint('Error playing pop sound: $e');
+      // Fallback to ui_click sound if pop files fail
+      try {
+        final fallbackSource = AudioSource.asset('assets/Sounds/ui_click.wav');
+        await _soundEffectsPlayer!.setAudioSource(fallbackSource);
+        await _soundEffectsPlayer!.play();
+      } catch (fallbackError) {
+        debugPrint('Error playing fallback sound: $fallbackError');
+      }
+    }
+  }
+
   /// Start playing syringe drag sound (looped)
   Future<void> startSyringeDragSound() async {
     if (!_isInitialized || _continuousSoundPlayer == null) {
@@ -369,6 +543,128 @@ class SoundService {
       }
     } catch (e) {
       debugPrint('Error stopping bubbles music: $e');
+    }
+  }
+
+  /// Play laboratory background music (for cryo sim activity)
+  Future<void> playLaboratoryMusic() async {
+    if (!_isInitialized || _activityMusicPlayer == null) {
+      debugPrint('Sound service not initialized or activity music player is null');
+      return;
+    }
+    
+    if (!_settingsService.isMusicEnabled) {
+      debugPrint('Music is disabled in settings');
+      return;
+    }
+
+    // If already playing, don't restart
+    if (_isActivityMusicPlaying) {
+      debugPrint('Laboratory music already playing');
+      return;
+    }
+
+    try {
+      // Pause regular background music
+      await pauseBackgroundMusic();
+      
+      // Load laboratory music from assets
+      final audioSource = AudioSource.asset('assets/Sounds/laboratory.wav');
+      
+      await _activityMusicPlayer!.setLoopMode(LoopMode.one);
+      await _activityMusicPlayer!.setAudioSource(audioSource);
+      
+      // Set volume from settings
+      try {
+        await _activityMusicPlayer!.setVolume(_settingsService.musicVolume);
+      } catch (e) {
+        debugPrint('Could not set activity music volume: $e');
+      }
+      
+      await _activityMusicPlayer!.play();
+      _isActivityMusicPlaying = true;
+      debugPrint('Laboratory music started');
+    } catch (e) {
+      debugPrint('Error playing laboratory music: $e');
+      _isActivityMusicPlaying = false;
+    }
+  }
+
+  /// Stop laboratory background music and resume regular background music
+  Future<void> stopLaboratoryMusic() async {
+    if (_activityMusicPlayer == null) return;
+    try {
+      await _activityMusicPlayer!.stop();
+      _isActivityMusicPlaying = false;
+      debugPrint('Laboratory music stopped');
+      
+      // Resume regular background music if enabled
+      if (_settingsService.isMusicEnabled) {
+        await resumeBackgroundMusic();
+      }
+    } catch (e) {
+      debugPrint('Error stopping laboratory music: $e');
+    }
+  }
+
+  /// Play beach background music (for rubber boat activity)
+  Future<void> playBeachMusic() async {
+    if (!_isInitialized || _activityMusicPlayer == null) {
+      debugPrint('Sound service not initialized or activity music player is null');
+      return;
+    }
+    
+    if (!_settingsService.isMusicEnabled) {
+      debugPrint('Music is disabled in settings');
+      return;
+    }
+
+    // If already playing, don't restart
+    if (_isActivityMusicPlaying) {
+      debugPrint('Beach music already playing');
+      return;
+    }
+
+    try {
+      // Pause regular background music
+      await pauseBackgroundMusic();
+      
+      // Load beach music from assets
+      final audioSource = AudioSource.asset('assets/Sounds/beach.wav');
+      
+      await _activityMusicPlayer!.setLoopMode(LoopMode.one);
+      await _activityMusicPlayer!.setAudioSource(audioSource);
+      
+      // Set volume from settings
+      try {
+        await _activityMusicPlayer!.setVolume(_settingsService.musicVolume);
+      } catch (e) {
+        debugPrint('Could not set activity music volume: $e');
+      }
+      
+      await _activityMusicPlayer!.play();
+      _isActivityMusicPlaying = true;
+      debugPrint('Beach music started');
+    } catch (e) {
+      debugPrint('Error playing beach music: $e');
+      _isActivityMusicPlaying = false;
+    }
+  }
+
+  /// Stop beach background music and resume regular background music
+  Future<void> stopBeachMusic() async {
+    if (_activityMusicPlayer == null) return;
+    try {
+      await _activityMusicPlayer!.stop();
+      _isActivityMusicPlaying = false;
+      debugPrint('Beach music stopped');
+      
+      // Resume regular background music if enabled
+      if (_settingsService.isMusicEnabled) {
+        await resumeBackgroundMusic();
+      }
+    } catch (e) {
+      debugPrint('Error stopping beach music: $e');
     }
   }
 

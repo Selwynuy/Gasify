@@ -36,6 +36,7 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
   // Performance optimization: throttle setState during dragging
   DateTime? _lastUpdateTime;
   static const _minUpdateInterval = Duration(milliseconds: 16); // ~60fps max
+  bool _isDraggingSoundPlaying = false; // Track if drag sound is currently playing
 
   @override
   void initState() {
@@ -70,8 +71,7 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
   }
 
   void _onPlungerDragStart(DragStartDetails details) {
-    // Start syringe drag sound when dragging begins
-    SoundService().startSyringeDragSound();
+    // Don't start sound here - wait for actual movement
   }
 
   void _onPlungerDragUpdate(DragUpdateDetails details) {
@@ -81,6 +81,24 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
       return;
     }
     _lastUpdateTime = now;
+    
+    // Check if there's actual movement (not just holding)
+    final movementDelta = details.delta.dy.abs();
+    const minMovementThreshold = 0.5; // Minimum pixels to consider it "moving"
+    
+    if (movementDelta > minMovementThreshold) {
+      // User is actively dragging - start sound if not already playing
+      if (!_isDraggingSoundPlaying) {
+        SoundService().startSyringeDragSound();
+        _isDraggingSoundPlaying = true;
+      }
+    } else {
+      // User is holding but not moving - stop sound
+      if (_isDraggingSoundPlaying) {
+        SoundService().stopSyringeDragSound();
+        _isDraggingSoundPlaying = false;
+      }
+    }
     
     setState(() {
       final delta = -details.delta.dy / 300;
@@ -138,7 +156,10 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
     _lastUpdateTime = null;
     
     // Stop syringe drag sound when dragging ends
-    SoundService().stopSyringeDragSound();
+    if (_isDraggingSoundPlaying) {
+      SoundService().stopSyringeDragSound();
+      _isDraggingSoundPlaying = false;
+    }
     
     if (!_isSealed && _balloonInSyringe && _balloonReleaseController != null) {
       final double currentSize = _balloonSize;

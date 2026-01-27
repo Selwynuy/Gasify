@@ -31,6 +31,7 @@ class _ActionButtonState extends State<ActionButton>
   late Animation<double> _scaleAnimation;
   Timer? _holdTimer;
   bool _isHeld = false;
+  bool _soundPlayed = false;
 
   @override
   void initState() {
@@ -51,8 +52,14 @@ class _ActionButtonState extends State<ActionButton>
     super.dispose();
   }
 
-  void _handleTapDown(TapDownDetails details) {
-    SoundService().playTouchSound();
+  void _handlePointerDown(PointerDownEvent event) {
+    // Register this pointer to skip wrapper sounds
+    SoundService.registerSkipWrapperSound(event.pointer);
+    
+    if (!_soundPlayed) {
+      SoundService().playTouchSound();
+      _soundPlayed = true;
+    }
     _controller.forward();
     _isHeld = true;
     
@@ -72,24 +79,33 @@ class _ActionButtonState extends State<ActionButton>
     }
   }
 
-  void _handleTapUp(TapUpDetails details) {
+  void _handlePointerUp(PointerUpEvent event) {
+    // Unregister this pointer
+    SoundService.unregisterSkipWrapperSound(event.pointer);
+    
     _isHeld = false;
+    _soundPlayed = false;
     _holdTimer?.cancel();
     _controller.reverse();
   }
 
-  void _handleTapCancel() {
+  void _handlePointerCancel(PointerCancelEvent event) {
+    // Unregister this pointer
+    SoundService.unregisterSkipWrapperSound(event.pointer);
+    
     _isHeld = false;
+    _soundPlayed = false;
     _holdTimer?.cancel();
     _controller.reverse();
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: _handleTapDown,
-      onTapUp: _handleTapUp,
-      onTapCancel: _handleTapCancel,
+    return Listener(
+      onPointerDown: _handlePointerDown,
+      onPointerUp: _handlePointerUp,
+      onPointerCancel: _handlePointerCancel,
+      behavior: HitTestBehavior.opaque,
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: Container(

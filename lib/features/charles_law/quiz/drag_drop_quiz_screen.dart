@@ -67,6 +67,9 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
   void _onWordDropped(int blankNumber, String word) {
     if (_isSubmitted) return;
 
+    // Play drop sound
+    SoundService().playPopSound();
+
     setState(() {
       // Decrease count of previous word if any
       final previousWord = _userAnswers[blankNumber];

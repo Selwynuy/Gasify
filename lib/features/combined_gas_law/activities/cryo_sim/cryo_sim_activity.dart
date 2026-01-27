@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:fl_chart/fl_chart.dart';
@@ -36,10 +35,13 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
   // Boom effect state
   bool _isBooming = false;
   late AnimationController _boomController;
-  late AnimationController _shakeController;
   late Animation<double> _boomAnimation;
-  late Animation<double> _shakeAnimation;
   static const double _boomThreshold = 500.0; // Kelvin - if T2 exceeds this, BOOM!
+  static const double _warningThreshold = 400.0; // Kelvin - warning starts at 80% of boom threshold
+  
+  // Warning effect state
+  late AnimationController _warningShakeController;
+  late Animation<double> _warningShakeAnimation;
 
   // Slider ranges
   static const double _minPressure = 50.0;
@@ -53,13 +55,9 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
   void initState() {
     super.initState();
     
-    // Initialize boom animation controllers
+    // Initialize boom animation controller
     _boomController = AnimationController(
       duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    );
-    _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     
@@ -67,8 +65,14 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
       CurvedAnimation(parent: _boomController, curve: Curves.easeOut),
     );
     
-    _shakeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _shakeController, curve: Curves.elasticOut),
+    // Initialize warning shake animation controller
+    _warningShakeController = AnimationController(
+      duration: const Duration(milliseconds: 100),
+      vsync: this,
+    );
+    
+    _warningShakeAnimation = Tween<double>(begin: -1.0, end: 1.0).animate(
+      CurvedAnimation(parent: _warningShakeController, curve: Curves.easeInOut),
     );
     
     _boomController.addStatusListener((status) {
@@ -78,12 +82,18 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
     });
     
     _calculateT2();
+    
+    // Start laboratory background music
+    SoundService().playLaboratoryMusic();
   }
 
   @override
   void dispose() {
+    // Stop laboratory background music
+    SoundService().stopLaboratoryMusic();
+    
     _boomController.dispose();
-    _shakeController.dispose();
+    _warningShakeController.dispose();
     super.dispose();
   }
 
@@ -105,6 +115,26 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
     return _t2Kelvin != null && _t2Kelvin! < _t1Kelvin;
   }
 
+  /// Check if we're in warning state (approaching boom threshold)
+  bool _isWarning() {
+    return _showAnswer && 
+           _t2Kelvin != null && 
+           _t2Kelvin! >= _warningThreshold && 
+           _t2Kelvin! < _boomThreshold &&
+           !_isBooming;
+  }
+
+  /// Get warning intensity (0.0 to 1.0) based on how close to boom threshold
+  double _getWarningIntensity() {
+    if (!_isWarning()) return 0.0;
+    if (_t2Kelvin == null) return 0.0;
+    
+    // Normalize between warning threshold and boom threshold
+    final range = _boomThreshold - _warningThreshold;
+    final progress = (_t2Kelvin! - _warningThreshold) / range;
+    return progress.clamp(0.0, 1.0);
+  }
+
   /// Calculate T2 using Combined Gas Law: P₁V₁/T₁ = P₂V₂/T₂
   /// Therefore: T₂ = (P₂ × V₂ × T₁) / (P₁ × V₁)
   /// Note: This calculates T2 internally but doesn't show the answer until CALCULATE is clicked
@@ -122,6 +152,17 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
     if (_showAnswer && _t2Kelvin != null && _t2Kelvin! > _boomThreshold && !_isBooming) {
       _triggerBoom();
     }
+    _updateWarningAnimation();
+  }
+
+  /// Update warning animation based on current state
+  void _updateWarningAnimation() {
+    if (_isWarning() && !_warningShakeController.isAnimating) {
+      _warningShakeController.repeat();
+    } else if (!_isWarning() && _warningShakeController.isAnimating) {
+      _warningShakeController.stop();
+      _warningShakeController.reset();
+    }
   }
 
   /// Trigger the boom effect
@@ -129,8 +170,8 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
     setState(() {
       _isBooming = true;
     });
-    SoundService().playTouchSound(); // Could add explosion sound here
-    _shakeController.forward();
+    // Play explosion sound
+    SoundService().playExplosionSound();
     _boomController.forward();
   }
 
@@ -148,7 +189,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
       _isBooming = false;
     });
     _boomController.reset();
-    _shakeController.reset();
     _calculateT2();
   }
 
@@ -273,27 +313,45 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
       body: SafeArea(
         child: Stack(
           children: [
-            // Main content area (full width) - Refrigerator only (with shake effect)
+            // Main content area (full width) - Refrigerator only (with warning effects)
             AnimatedBuilder(
-              animation: _shakeAnimation,
+              animation: _warningShakeAnimation,
               builder: (context, child) {
-                final shakeOffset = _isBooming
+                final isWarning = _isWarning();
+                final warningIntensity = _getWarningIntensity();
+                
+                // Calculate shake offset (subtle vibration)
+                final shakeOffset = isWarning
                     ? Offset(
-                        (0.5 - _shakeAnimation.value) * 20,
-                        (0.5 - _shakeAnimation.value) * 20,
+                        _warningShakeAnimation.value * 2 * warningIntensity,
+                        (_warningShakeAnimation.value * 0.7) * 2 * warningIntensity,
                       )
                     : Offset.zero;
+                
                 return Transform.translate(
                   offset: shakeOffset,
                   child: Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade800,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.cyan.shade700, width: 2),
+                    child: ColorFiltered(
+                      colorFilter: isWarning
+                          ? ColorFilter.mode(
+                              Colors.red.withValues(alpha: 0.5 * warningIntensity),
+                              BlendMode.overlay,
+                            )
+                          : const ColorFilter.mode(Colors.transparent, BlendMode.overlay),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade800,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isWarning
+                                ? Colors.red.shade400
+                                : Colors.cyan.shade700,
+                            width: isWarning ? 3 : 2,
+                          ),
+                        ),
+                        child: _buildRefrigeratorDiagram(),
                       ),
-                      child: _buildRefrigeratorDiagram(),
                     ),
                   ),
                 );
@@ -537,6 +595,62 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
                     coolingIntensity: _getCoolingIntensity(),
                   ),
                 ),
+              // Hot smoke effect (only when in warning state - overheating)
+              if (_isWarning())
+                Positioned(
+                  left: constraints.maxWidth * 0.25,
+                  top: constraints.maxHeight * 0.1,
+                  width: constraints.maxWidth * 0.5,
+                  height: constraints.maxHeight * 0.6,
+                  child: _HotSmokeWidget(
+                    warningIntensity: _getWarningIntensity(),
+                  ),
+                ),
+              // Warning text overlay
+              if (_isWarning())
+                Positioned(
+                  top: constraints.maxHeight * 0.275,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade900.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade400, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withOpacity(0.5),
+                            blurRadius: 10,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.warning, color: Colors.yellow.shade300, size: 24),
+                          const SizedBox(width: 8),
+                          Text(
+                            'WARNING! OVERHEATING!',
+                            style: TextStyle(
+                              color: Colors.yellow.shade300,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              shadows: [
+                                Shadow(
+                                  color: Colors.black,
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         );
@@ -733,8 +847,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
             onChanged: (value) {
               setState(() {
                 _p1 = value;
-                _showAnswer = false;
-                _calculateT2(); // Recalculate T2 when P1 changes
               });
               SoundService().playTouchSound();
             },
@@ -749,8 +861,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
             onChanged: (value) {
               setState(() {
                 _p2 = value;
-                _showAnswer = false;
-                _calculateT2(); // Recalculate T2 when P2 changes
               });
               SoundService().playTouchSound();
             },
@@ -765,8 +875,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
             onChanged: (value) {
               setState(() {
                 _v1 = value;
-                _showAnswer = false;
-                _calculateT2(); // Recalculate T2 when V1 changes
               });
               SoundService().playTouchSound();
             },
@@ -781,8 +889,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
             onChanged: (value) {
               setState(() {
                 _v2 = value;
-                _showAnswer = false;
-                _calculateT2(); // Recalculate T2 when V2 changes
               });
               SoundService().playTouchSound();
             },
@@ -797,8 +903,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
             onChanged: (value) {
               setState(() {
                 _t1Celsius = value;
-                _showAnswer = false;
-                _calculateT2(); // Recalculate T2 when T1 changes
               });
               SoundService().playTouchSound();
             },
@@ -1051,142 +1155,48 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
       animation: _boomAnimation,
       builder: (context, child) {
         final screenSize = MediaQuery.of(context).size;
-        final centerX = screenSize.width / 2;
-        final centerY = screenSize.height / 2;
         
-        // Explosion radius grows with animation
-        final radius = _boomAnimation.value * screenSize.width * 0.8;
-        
-        // Opacity fades out
-        final opacity = (1.0 - _boomAnimation.value).clamp(0.0, 1.0);
-        
-        return CustomPaint(
-          painter: _BoomPainter(
-            center: Offset(centerX, centerY),
-            radius: radius,
-            opacity: opacity,
-            progress: _boomAnimation.value,
-          ),
-          child: Container(
-            color: Colors.transparent,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '💥 BOOM! 💥',
-                    style: TextStyle(
-                      fontSize: 60,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange.shade400.withValues(alpha: opacity),
-                      shadows: [
-                        Shadow(
-                          color: Colors.red.withValues(alpha: opacity),
-                          blurRadius: 20,
+        return Container(
+          color: Colors.black.withValues(alpha: 0.7),
+          child: Center(
+            child: Image.asset(
+              'assets/combined_gas_law/Refrigerator_boom.png',
+              width: screenSize.width * 0.8,
+              height: screenSize.height * 0.8,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('Failed to load Refrigerator_boom.png: $error');
+                return Container(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '💥 BOOM! 💥',
+                        style: TextStyle(
+                          fontSize: 60,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade400,
                         ),
-                        Shadow(
-                          color: Colors.yellow.withValues(alpha: opacity),
-                          blurRadius: 30,
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Temperature Too High!',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Temperature Too High!',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white.withValues(alpha: opacity),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Restarting simulation...',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.white70.withValues(alpha: opacity),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         );
       },
     );
-  }
-}
-
-/// Custom painter for boom explosion effect
-class _BoomPainter extends CustomPainter {
-  final Offset center;
-  final double radius;
-  final double opacity;
-  final double progress;
-
-  _BoomPainter({
-    required this.center,
-    required this.radius,
-    required this.opacity,
-    required this.progress,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Draw multiple explosion rings
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
-
-    // Outer ring (orange/red)
-    paint.color = Colors.orange.withValues(alpha: opacity * 0.6);
-    canvas.drawCircle(center, radius, paint);
-
-    // Middle ring (yellow)
-    paint.color = Colors.yellow.withValues(alpha: opacity * 0.8);
-    canvas.drawCircle(center, radius * 0.7, paint);
-
-    // Inner ring (white)
-    paint.color = Colors.white.withValues(alpha: opacity);
-    canvas.drawCircle(center, radius * 0.4, paint);
-
-    // Draw explosion particles
-    final particlePaint = Paint()
-      ..style = PaintingStyle.fill;
-
-    for (int i = 0; i < 20; i++) {
-      final angle = (i / 20) * 2 * math.pi;
-      final distance = radius * (0.5 + progress * 0.5);
-      final x = center.dx + distance * math.cos(angle);
-      final y = center.dy + distance * math.sin(angle);
-      
-      particlePaint.color = [
-        Colors.orange,
-        Colors.red,
-        Colors.yellow,
-        Colors.white,
-      ][i % 4].withValues(alpha: opacity);
-      
-      canvas.drawCircle(
-        Offset(x, y),
-        5 + progress * 10,
-        particlePaint,
-      );
-    }
-
-    // Draw background flash
-    final flashPaint = Paint()
-      ..style = PaintingStyle.fill
-      ..color = Colors.white.withValues(alpha: opacity * 0.3 * (1 - progress));
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), flashPaint);
-  }
-
-  @override
-  bool shouldRepaint(_BoomPainter oldDelegate) {
-    return oldDelegate.radius != radius ||
-        oldDelegate.opacity != opacity ||
-        oldDelegate.progress != progress;
   }
 }
 
@@ -1549,5 +1559,251 @@ class _CoolingSmokePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CoolingSmokePainter oldDelegate) => true; // Always repaint for smooth animation
+}
+
+// Hot smoke widget for warning/overheating state
+class _HotSmokeWidget extends StatefulWidget {
+  final double warningIntensity; // 0.0 to 1.0
+
+  const _HotSmokeWidget({
+    required this.warningIntensity,
+  });
+
+  @override
+  State<_HotSmokeWidget> createState() => _HotSmokeWidgetState();
+}
+
+class _HotSmokeWidgetState extends State<_HotSmokeWidget> with TickerProviderStateMixin {
+  final List<_HotSmokeParticle> _particles = [];
+  Timer? _spawnTimer;
+  int _maxParticles = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateMaxParticles();
+    _initializeParticles();
+    _startSpawning();
+  }
+
+  @override
+  void didUpdateWidget(_HotSmokeWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.warningIntensity != widget.warningIntensity) {
+      _updateMaxParticles();
+    }
+  }
+
+  void _updateMaxParticles() {
+    // Scale number of smoke particles based on warning intensity
+    // Minimum 8 particles, maximum 25 particles
+    _maxParticles = (8 + (widget.warningIntensity * 17)).round();
+  }
+
+  void _initializeParticles() {
+    final random = DateTime.now().millisecondsSinceEpoch;
+    for (int i = 0; i < _maxParticles; i++) {
+      final seed = (random + i * 1000) % 10000;
+      final duration = 2000.0 + (seed % 1500); // Random duration between 2000-3500ms (faster than cooling)
+      final xOffset = (seed % 100 - 50).toDouble(); // Random X offset between -50 to 50
+      
+      final controller = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: duration.toInt()),
+      );
+      
+      _particles.add(_HotSmokeParticle(
+        controller: controller,
+        xOffset: xOffset,
+        size: 5.0 + (seed % 12), // Random size between 5-17
+        seed: seed,
+      ));
+    }
+  }
+
+  void _startSpawning() {
+    void spawnNext() {
+      if (!mounted || widget.warningIntensity <= 0) return;
+      
+      // Find particles that are not currently animating
+      final availableParticles = _particles.where((p) => !p.controller.isAnimating).toList();
+      
+      if (availableParticles.isNotEmpty) {
+        // Pick a random available particle
+        final random = DateTime.now().millisecondsSinceEpoch;
+        final particle = availableParticles[random % availableParticles.length];
+        
+        // Assign a new random position for this particle spawn
+        final randomX = (random * 7) % 10000;
+        final randomY = (random * 13) % 10000;
+        particle.randomPosition = Offset(
+          randomX / 10000.0,
+          randomY / 10000.0,
+        );
+        
+        // Start the particle animation
+        particle.controller.forward(from: 0.0).then((_) {
+          if (mounted) {
+            particle.controller.reset();
+            particle.randomPosition = null;
+          }
+        });
+      }
+      
+      // Spawn rate scales with warning intensity (faster spawning = more intense warning)
+      // Base delay 300ms, scales down to 100ms at max intensity
+      final baseDelay = 300;
+      final intensityDelay = (baseDelay * (1.0 - widget.warningIntensity)).round();
+      final randomDelay = intensityDelay + (DateTime.now().millisecondsSinceEpoch % 200);
+      _spawnTimer = Timer(Duration(milliseconds: randomDelay.clamp(100, 500)), spawnNext);
+    }
+    
+    spawnNext();
+  }
+
+  @override
+  void dispose() {
+    _spawnTimer?.cancel();
+    for (var particle in _particles) {
+      particle.controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.warningIntensity <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    return ListenableBuilder(
+      listenable: Listenable.merge(_particles.map((p) => p.controller)),
+      builder: (context, child) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return CustomPaint(
+              size: Size(constraints.maxWidth, constraints.maxHeight),
+              painter: _HotSmokePainter(
+                particles: _particles,
+                warningIntensity: widget.warningIntensity,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _HotSmokeParticle {
+  final AnimationController controller;
+  final double xOffset;
+  final double size;
+  final int seed;
+  Offset? randomPosition;
+
+  _HotSmokeParticle({
+    required this.controller,
+    required this.xOffset,
+    required this.size,
+    required this.seed,
+    this.randomPosition,
+  });
+}
+
+class _HotSmokePainter extends CustomPainter {
+  final List<_HotSmokeParticle> particles;
+  final double warningIntensity;
+
+  _HotSmokePainter({
+    required this.particles,
+    required this.warningIntensity,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var particle in particles) {
+      if (!particle.controller.isAnimating && particle.controller.value == 0) {
+        continue;
+      }
+
+      final progress = particle.controller.value;
+      
+      // Use the random position assigned when particle spawned
+      Offset position;
+      if (particle.randomPosition != null) {
+        position = particle.randomPosition!;
+      } else {
+        final xSeed = (particle.seed * 7) % 10000;
+        final ySeed = (particle.seed * 13) % 10000;
+        position = Offset(xSeed / 10000.0, ySeed / 10000.0);
+      }
+      
+      // Scale random position to actual container bounds
+      final minX = particle.size + 5;
+      final maxX = size.width - particle.size - 5;
+      final startX = minX + position.dx * (maxX - minX);
+      
+      final minY = particle.size + 5;
+      final maxY = size.height - particle.size - 5;
+      final startY = minY + position.dy * (maxY - minY);
+      
+      // Hot smoke flows UPWARD (negative Y drift) and expands
+      final driftX = (progress - 0.5) * 8.0; // Horizontal drift (less than cooling)
+      final driftY = -progress * 30.0; // Upward flow (negative = upward)
+      
+      // Clamp positions
+      final x = (startX + driftX).clamp(particle.size + 2, size.width - particle.size - 2);
+      final y = (startY + driftY).clamp(particle.size + 2, size.height - particle.size - 2);
+      
+      // Opacity: fade in, stay visible, then fade out
+      final opacity = _calculateHotOpacity(progress) * warningIntensity;
+      
+      // Smoke size increases as it rises (expands more than cooling smoke)
+      final currentSize = particle.size * (1.0 + progress * 1.2);
+      
+      // Draw hot smoke effect - red/orange colors
+      final smokePaint = Paint()
+        ..style = PaintingStyle.fill;
+      
+      // Hot smoke colors (red/orange gradient)
+      const darkRed = Color(0xFF8B0000);
+      const red = Color(0xFFDC143C);
+      const orange = Color(0xFFFF6347);
+      const lightOrange = Color(0xFFFF8C69);
+      
+      // Main smoke wisp (red/orange)
+      smokePaint.color = red.withOpacity(opacity * 0.8);
+      canvas.drawCircle(Offset(x, y), currentSize, smokePaint);
+      
+      // Additional wisps for more realistic hot smoke effect
+      smokePaint.color = orange.withOpacity(opacity * 0.6);
+      canvas.drawCircle(Offset(x - currentSize * 0.3, y - currentSize * 0.2), currentSize * 0.7, smokePaint);
+      canvas.drawCircle(Offset(x + currentSize * 0.3, y - currentSize * 0.2), currentSize * 0.7, smokePaint);
+      canvas.drawCircle(Offset(x, y - currentSize * 0.4), currentSize * 0.6, smokePaint);
+      
+      // Outer glow for hot air effect
+      smokePaint.color = lightOrange.withOpacity(opacity * 0.4);
+      canvas.drawCircle(Offset(x, y), currentSize * 1.4, smokePaint);
+      
+      // Dark red core for intense heat
+      smokePaint.color = darkRed.withOpacity(opacity * 0.5);
+      canvas.drawCircle(Offset(x, y), currentSize * 0.6, smokePaint);
+    }
+  }
+
+  /// Calculate opacity for hot smoke (similar to cooling but slightly different)
+  double _calculateHotOpacity(double progress) {
+    if (progress < 0.15) {
+      return (progress / 0.15) * 0.95;
+    } else if (progress < 0.75) {
+      return 0.95;
+    } else {
+      return 0.95 * (1.0 - (progress - 0.75) / 0.25);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_HotSmokePainter oldDelegate) => true;
 }
 

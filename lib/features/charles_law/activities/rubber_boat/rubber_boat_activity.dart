@@ -40,6 +40,16 @@ class _RubberBoatActivityState extends State<RubberBoatActivity> {
     _finalTempC = _finalTempC.clamp(_initialTempC, _maxFinalTempC);
     // Calculate volume for visual effects, but don't show answer yet
     _calculateVolume();
+    
+    // Start beach background music
+    SoundService().playBeachMusic();
+  }
+
+  @override
+  void dispose() {
+    // Stop beach background music
+    SoundService().stopBeachMusic();
+    super.dispose();
   }
 
   /// Convert Celsius to Kelvin

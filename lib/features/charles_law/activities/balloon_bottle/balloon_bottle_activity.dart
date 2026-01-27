@@ -1712,6 +1712,9 @@ class _DropZoneState extends State<_DropZone> with SingleTickerProviderStateMixi
   Widget build(BuildContext context) {
     return DragTarget<String>(
       onAcceptWithDetails: (details) {
+        // Play drop sound when item is dropped
+        SoundService().playPopSound();
+        
         final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
         if (renderBox != null) {
           final position = renderBox.localToGlobal(Offset.zero);
