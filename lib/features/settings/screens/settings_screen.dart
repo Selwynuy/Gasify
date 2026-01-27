@@ -227,19 +227,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 40),
                 // About section
                 _buildSection(
-                  title: 'About',
+                  title: 'About Us',
                   icon: Icons.info,
-                  children: [
-                    const ListTile(
+                  children: const [
+                    ListTile(
+                      leading: Icon(Icons.group, color: Colors.white70),
                       title: Text(
-                        'Boyle\'s Law Lab',
-                        style: TextStyle(color: Colors.white),
+                        'Researchers',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       subtitle: Text(
-                        'An educational simulation of scuba diving gas laws',
+                        '• Shaima L. Manap\n'
+                        '• Sharmaine Lyza P. Serentas\n'
+                        '• Hussem Jaib C. Surposa',
                         style: TextStyle(color: Colors.white70),
                       ),
-                      leading: Icon(Icons.science, color: Colors.white70),
+                    ),
+                    ListTile(
+                      leading: Icon(Icons.code, color: Colors.white70),
+                      title: Text(
+                        'Developer',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Selwyn Uy',
+                        style: TextStyle(color: Colors.white70),
+                      ),
                     ),
                   ],
                 ),

@@ -848,7 +848,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
               setState(() {
                 _p1 = value;
               });
-              SoundService().playTouchSound();
             },
           ),
           SizedBox(height: spacing),
@@ -862,7 +861,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
               setState(() {
                 _p2 = value;
               });
-              SoundService().playTouchSound();
             },
           ),
           SizedBox(height: spacing),
@@ -876,7 +874,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
               setState(() {
                 _v1 = value;
               });
-              SoundService().playTouchSound();
             },
           ),
           SizedBox(height: spacing),
@@ -890,7 +887,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
               setState(() {
                 _v2 = value;
               });
-              SoundService().playTouchSound();
             },
           ),
           SizedBox(height: spacing),
@@ -904,7 +900,6 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
               setState(() {
                 _t1Celsius = value;
               });
-              SoundService().playTouchSound();
             },
           ),
         ],
@@ -941,6 +936,9 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
           activeColor: Colors.cyan,
           inactiveColor: Colors.grey.shade600,
           onChanged: onChanged,
+          onChangeStart: (_) {
+            SoundService().playTouchSound();
+          },
         ),
       ],
     );

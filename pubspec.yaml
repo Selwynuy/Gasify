@@ -1,4 +1,4 @@
-name: scuba_gas_laws_game
+name: gasify
 description: A Flutter mobile app that simulates a scuba diving gas-laws game based on Boyle's Law.
 publish_to: "none"
 

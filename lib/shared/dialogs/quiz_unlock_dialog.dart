@@ -101,7 +101,7 @@ class _QuizUnlockDialogState extends State<QuizUnlockDialog> {
         const SizedBox(height: 205),
         // Question text
         ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 200),
+          constraints: const BoxConstraints(maxWidth: 260),
           child: Text(
             widget.question.question,
             style: const TextStyle(

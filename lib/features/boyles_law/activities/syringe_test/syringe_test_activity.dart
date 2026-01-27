@@ -71,7 +71,11 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
   }
 
   void _onPlungerDragStart(DragStartDetails details) {
-    // Don't start sound here - wait for actual movement
+    // Start continuous syringe drag sound as soon as user begins dragging
+    if (!_isDraggingSoundPlaying) {
+      SoundService().startSyringeDragSound();
+      _isDraggingSoundPlaying = true;
+    }
   }
 
   void _onPlungerDragUpdate(DragUpdateDetails details) {
@@ -81,24 +85,6 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
       return;
     }
     _lastUpdateTime = now;
-    
-    // Check if there's actual movement (not just holding)
-    final movementDelta = details.delta.dy.abs();
-    const minMovementThreshold = 0.5; // Minimum pixels to consider it "moving"
-    
-    if (movementDelta > minMovementThreshold) {
-      // User is actively dragging - start sound if not already playing
-      if (!_isDraggingSoundPlaying) {
-        SoundService().startSyringeDragSound();
-        _isDraggingSoundPlaying = true;
-      }
-    } else {
-      // User is holding but not moving - stop sound
-      if (_isDraggingSoundPlaying) {
-        SoundService().stopSyringeDragSound();
-        _isDraggingSoundPlaying = false;
-      }
-    }
     
     setState(() {
       final delta = -details.delta.dy / 300;

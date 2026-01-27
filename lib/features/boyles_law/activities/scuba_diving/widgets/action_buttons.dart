@@ -80,9 +80,6 @@ class _ActionButtonState extends State<ActionButton>
   }
 
   void _handlePointerUp(PointerUpEvent event) {
-    // Unregister this pointer
-    SoundService.unregisterSkipWrapperSound(event.pointer);
-    
     _isHeld = false;
     _soundPlayed = false;
     _holdTimer?.cancel();
@@ -90,9 +87,6 @@ class _ActionButtonState extends State<ActionButton>
   }
 
   void _handlePointerCancel(PointerCancelEvent event) {
-    // Unregister this pointer
-    SoundService.unregisterSkipWrapperSound(event.pointer);
-    
     _isHeld = false;
     _soundPlayed = false;
     _holdTimer?.cancel();

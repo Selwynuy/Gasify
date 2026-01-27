@@ -360,6 +360,8 @@ class _RubberBoatActivityState extends State<RubberBoatActivity> {
                   _calculateVolume(); // Update visuals
                   _showAnswer = false; // Hide answer when sliders change
                 });
+              },
+              onChangeStart: (_) {
                 SoundService().playTouchSound();
               },
             ),
@@ -386,6 +388,8 @@ class _RubberBoatActivityState extends State<RubberBoatActivity> {
                   _calculateVolume(); // Update visuals
                   _showAnswer = false; // Hide answer when sliders change
                 });
+              },
+              onChangeStart: (_) {
                 SoundService().playTouchSound();
               },
             ),

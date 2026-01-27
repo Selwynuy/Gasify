@@ -13,7 +13,7 @@ class QuizQuestions {
   );
 
   static const charlesLawQuestion = QuizQuestion(
-    question: "To unlock this activity, you need to identify first what relationship is described by Charles's Law",
+    question: "What relationship is described by Charles's Law",
     options: [
       "A. volume+temperature at constant pressure",
       "B. temperature+pressure+volume",
@@ -23,7 +23,7 @@ class QuizQuestions {
   );
 
   static const combinedGasLawQuestion = QuizQuestion(
-    question: "To unlock this activity, you need to identify first what relationship is described by Mixed Gas Law",
+    question: "What relationship is described by Mixed Gas Law",
     options: [
       "A. volume+pressure at constant temperature",
       "B. volume+temperature at constant pressure",

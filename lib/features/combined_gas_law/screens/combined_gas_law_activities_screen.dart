@@ -99,19 +99,6 @@ class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitie
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.help_outline, color: Colors.white, size: 24),
-                      ),
-                      onPressed: () {
-                        // TODO: Show info dialog
-                      },
-                    ),
-                    IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(Icons.settings, color: Colors.white, size: 24),
