@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import '../activities/cryo_sim/cryo_sim_activity.dart';
 import '../activities/true_false/true_false_activity.dart';
 import '../../settings/screens/settings_screen.dart';
-import '../../../shared/services/activity_unlock_service.dart';
-import '../../../shared/dialogs/quiz_unlock_dialog.dart';
-import '../../../shared/services/quiz_questions.dart';
 
 /// Screen for selecting which Combined Gas Law activity to explore.
 class CombinedGasLawActivitiesScreen extends StatefulWidget {
@@ -15,54 +12,6 @@ class CombinedGasLawActivitiesScreen extends StatefulWidget {
 }
 
 class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitiesScreen> {
-  bool _trueFalseUnlocked = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkUnlockStatus();
-  }
-
-  Future<void> _checkUnlockStatus() async {
-    final trueFalseUnlocked = await ActivityUnlockService.isActivityUnlocked('combined_true_false');
-    setState(() {
-      _trueFalseUnlocked = trueFalseUnlocked;
-    });
-  }
-
-  Future<void> _handleActivityTap(String activityKey, Widget activityScreen) async {
-    if (!mounted) return;
-    final navigatorContext = context;
-    
-    final isUnlocked = await ActivityUnlockService.isActivityUnlocked(activityKey);
-    
-    if (isUnlocked && mounted) {
-      Navigator.push(
-        navigatorContext,
-        MaterialPageRoute(builder: (context) => activityScreen),
-      );
-    } else {
-      if (!mounted) return;
-      final result = await showDialog<bool>(
-        context: navigatorContext,
-        builder: (context) => QuizUnlockDialog(
-          question: QuizQuestions.combinedGasLawQuestion,
-          onUnlocked: () async {
-            await ActivityUnlockService.unlockActivity(activityKey);
-            await _checkUnlockStatus();
-          },
-        ),
-      );
-      
-      if (result == true && mounted) {
-        Navigator.push(
-          navigatorContext,
-          MaterialPageRoute(builder: (context) => activityScreen),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -153,11 +102,10 @@ class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitie
                           _ActivityButton(
                             title: "True or False",
                             icon: Icons.check_circle_outline,
-                            isLocked: !_trueFalseUnlocked,
                             onPressed: () {
-                              _handleActivityTap(
-                                'combined_true_false',
-                                const TrueFalseActivity(),
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => const TrueFalseActivity()),
                               );
                             },
                           ),
@@ -180,13 +128,11 @@ class _ActivityButton extends StatefulWidget {
   final String title;
   final IconData icon;
   final VoidCallback onPressed;
-  final bool isLocked;
 
   const _ActivityButton({
     required this.title,
     required this.icon,
     required this.onPressed,
-    this.isLocked = false,
   });
 
   @override
@@ -237,14 +183,10 @@ class _ActivityButtonState extends State<_ActivityButton>
             width: 280,
             child: ElevatedButton.icon(
               onPressed: widget.onPressed,
-              icon: widget.isLocked 
-                  ? const Icon(Icons.lock, size: 28)
-                  : Icon(widget.icon, size: 28),
+              icon: Icon(widget.icon, size: 28),
               label: Text(widget.title),
               style: ElevatedButton.styleFrom(
-                backgroundColor: widget.isLocked 
-                    ? Colors.grey.shade400
-                    : Colors.lightBlue.shade400,
+                backgroundColor: Colors.lightBlue.shade400,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
                 shape: RoundedRectangleBorder(

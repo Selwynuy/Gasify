@@ -239,7 +239,7 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
       backgroundColor: Colors.grey.shade900,
       appBar: AppBar(
         title: Text(
-          "CRYO-SIM: Refrigeration Physics",
+          "CRYO-SIM",
           style: TextStyle(
             color: Colors.cyan,
             fontWeight: FontWeight.bold,

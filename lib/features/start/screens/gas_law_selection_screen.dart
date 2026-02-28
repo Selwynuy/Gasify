@@ -3,10 +3,82 @@ import '../../boyles_law/screens/boyles_law_activities_screen.dart';
 import '../../charles_law/screens/charles_law_activities_screen.dart';
 import '../../combined_gas_law/screens/combined_gas_law_activities_screen.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../../../shared/services/activity_unlock_service.dart';
+import '../../../shared/dialogs/quiz_unlock_dialog.dart';
+import '../../../shared/services/quiz_questions.dart';
 
 /// Screen for selecting which gas law to explore.
-class GasLawSelectionScreen extends StatelessWidget {
+class GasLawSelectionScreen extends StatefulWidget {
   const GasLawSelectionScreen({super.key});
+
+  @override
+  State<GasLawSelectionScreen> createState() => _GasLawSelectionScreenState();
+}
+
+class _GasLawSelectionScreenState extends State<GasLawSelectionScreen> {
+  bool _boylesUnlocked = false;
+  bool _charlesUnlocked = false;
+  bool _combinedUnlocked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUnlockStatus();
+  }
+
+  Future<void> _checkUnlockStatus() async {
+    final boyles =
+        await ActivityUnlockService.isActivityUnlocked('law_boyles');
+    final charles =
+        await ActivityUnlockService.isActivityUnlocked('law_charles');
+    final combined =
+        await ActivityUnlockService.isActivityUnlocked('law_combined');
+
+    if (!mounted) return;
+    setState(() {
+      _boylesUnlocked = boyles;
+      _charlesUnlocked = charles;
+      _combinedUnlocked = combined;
+    });
+  }
+
+  Future<void> _handleLawTap({
+    required String lawKey,
+    required Widget screen,
+    required QuizQuestion? question,
+    required bool isUnlocked,
+  }) async {
+    // If already unlocked or no question configured, just navigate.
+    if (isUnlocked || question == null) {
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => screen),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final navigatorContext = context;
+
+    final result = await showDialog<bool>(
+      context: navigatorContext,
+      builder: (context) => QuizUnlockDialog(
+        question: question,
+        onUnlocked: () async {
+          await ActivityUnlockService.unlockActivity(lawKey);
+          await _checkUnlockStatus();
+        },
+      ),
+    );
+
+    if (result == true && mounted) {
+      Navigator.push(
+        navigatorContext,
+        MaterialPageRoute(builder: (context) => screen),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,30 +144,39 @@ class GasLawSelectionScreen extends StatelessWidget {
                         children: [
                           _GasLawButton(
                             title: "Boyle's Law",
+                            isLocked: !_boylesUnlocked,
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const BoylesLawActivitiesScreen()),
+                              _handleLawTap(
+                                lawKey: 'law_boyles',
+                                screen: const BoylesLawActivitiesScreen(),
+                                question: QuizQuestions.boylesLawQuestion,
+                                isUnlocked: _boylesUnlocked,
                               );
                             },
                           ),
                           const SizedBox(height: 20),
                           _GasLawButton(
                             title: "Charles Law",
+                            isLocked: !_charlesUnlocked,
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const CharlesLawActivitiesScreen()),
+                              _handleLawTap(
+                                lawKey: 'law_charles',
+                                screen: const CharlesLawActivitiesScreen(),
+                                question: QuizQuestions.charlesLawQuestion,
+                                isUnlocked: _charlesUnlocked,
                               );
                             },
                           ),
                           const SizedBox(height: 20),
                           _GasLawButton(
                             title: "Combined Gas Law",
+                            isLocked: !_combinedUnlocked,
                             onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => const CombinedGasLawActivitiesScreen()),
+                              _handleLawTap(
+                                lawKey: 'law_combined',
+                                screen: const CombinedGasLawActivitiesScreen(),
+                                question: QuizQuestions.combinedGasLawQuestion,
+                                isUnlocked: _combinedUnlocked,
                               );
                             },
                           ),
@@ -117,10 +198,12 @@ class GasLawSelectionScreen extends StatelessWidget {
 class _GasLawButton extends StatefulWidget {
   final String title;
   final VoidCallback onPressed;
+  final bool isLocked;
 
   const _GasLawButton({
     required this.title,
     required this.onPressed,
+    this.isLocked = false,
   });
 
   @override
@@ -161,7 +244,8 @@ class _GasLawButtonState extends State<_GasLawButton>
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.lightBlue.withValues(alpha: _glowAnimation.value * 0.8),
+                color: (widget.isLocked ? Colors.grey : Colors.lightBlue)
+                    .withValues(alpha: _glowAnimation.value * 0.8),
                 blurRadius: 20 * _glowAnimation.value,
                 spreadRadius: 5 * _glowAnimation.value,
               ),
@@ -172,7 +256,9 @@ class _GasLawButtonState extends State<_GasLawButton>
             child: ElevatedButton(
               onPressed: widget.onPressed,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.lightBlue.shade400,
+                backgroundColor: widget.isLocked
+                    ? Colors.grey.shade400
+                    : Colors.lightBlue.shade400,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
                 shape: RoundedRectangleBorder(
