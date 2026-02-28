@@ -71,14 +71,27 @@ class _CharlesLawActivitiesScreenState extends State<CharlesLawActivitiesScreen>
                     color: Colors.white.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
-                    "Charles Law Activities",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    children: [
+                      const Text(
+                        "Charles Law Activities",
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Charles's Law states that the volume of a fixed mass of an ideal gas is directly proportional to its absolute temperature (in Kelvin), provided pressure remains constant",
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.black87,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               ),

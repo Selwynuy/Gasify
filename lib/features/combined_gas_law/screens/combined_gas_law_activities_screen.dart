@@ -70,14 +70,27 @@ class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitie
                     color: Colors.white.withValues(alpha: 0.9),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
-                    "Combined Gas Law Activities",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    children: [
+                      const Text(
+                        "Combined Gas Law Activities",
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "The combined gas law merges Boyle's Law, Charles's Law, and Gay-Lussac's Law to relate the pressure (P), volume (V), and temperature (T) of a fixed amount of gas.",
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.black87,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ),
                 ),
               ),
