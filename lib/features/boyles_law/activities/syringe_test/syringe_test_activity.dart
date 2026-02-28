@@ -331,67 +331,138 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
           ),
         ),
         child: SafeArea(
-          child: Column(
+          child: Stack(
             children: [
-              Expanded(
-                child: LayoutBuilder(builder: (context, constraints) {
-                  return Stack(
-                  children: [
-                      Positioned(
-                        left: 20,
-                        top: 20,
-                        bottom: 20,
-                        width: 120,
-                        child: RepaintBoundary(
-                          child: _VerticalSyringeWidget(
+              Column(
+                children: [
+                  Expanded(
+                    child: LayoutBuilder(builder: (context, constraints) {
+                      return Stack(
+                        children: [
+                          Positioned(
+                            left: 20,
+                            top: 20,
+                            bottom: 20,
+                            width: 120,
+                            child: RepaintBoundary(
+                              child: _VerticalSyringeWidget(
                                 plungerPosition: _plungerPosition,
                                 isSealed: _isSealed,
                                 balloonInSyringe: _balloonInSyringe,
                                 balloonSize: _balloonSize,
-                            isAtMaxPressure: _isAtMaxPressure,
+                                isAtMaxPressure: _isAtMaxPressure,
                                 onPlungerDragStart: _onPlungerDragStart,
                                 onPlungerDrag: _onPlungerDragUpdate,
                                 onPlungerDragEnd: _onPlungerDragEnd,
                               ),
-                        ),
+                            ),
                           ),
+                          Positioned(
+                            top: 80, // Adjusted top position for the graph
+                            right: 20,
+                            width: constraints.maxWidth - 180,
+                            height: 250,
+                            child: RepaintBoundary(
+                              child: _PressureVolumeGraph(
+                                points: _graphPoints,
+                                currentVolume: _currentVolume,
+                                currentPressure: _pressure,
+                              ),
+                            ),
+                          ),
+                          if (!_balloonInSyringe)
                             Positioned(
-                        top: 20,
-                        right: 20,
-                        width: constraints.maxWidth - 180,
-                        height: 250,
-                        child: RepaintBoundary(
-                          child: _PressureVolumeGraph(
-                            points: _graphPoints,
-                            currentVolume: _currentVolume,
-                            currentPressure: _pressure,
-                          ),
-                        ),
-                      ),
-                      if (!_balloonInSyringe)
-                        Positioned(
-                          left: _balloonPosition.dx,
-                          top: _balloonPosition.dy,
-                          child: GestureDetector(
-                            onTap: () {
-                              // Play boop sound when balloon is tapped
-                              SoundService().playBoopSound();
-                            },
-                            onPanUpdate: (details) => _onBalloonDragUpdate(details, constraints),
-                            onPanEnd: _onBalloonDragEnd,
-                            child: const _BalloonWidget(size: Size(50, 60)),
-                      ),
-                    ),
-                  ],
-                  );
-                }),
-              ),
-              Container(
-                padding: const EdgeInsets.all(12.0),
-                color: Colors.white.withValues(alpha: 0.9),
-                child: Column(
+                              left: _balloonPosition.dx,
+                              top: _balloonPosition.dy,
+                              child: GestureDetector(
+                                onTap: () {
+                                  // Play boop sound when balloon is tapped
+                                  SoundService().playBoopSound();
+                                },
+                                onPanUpdate: (details) =>
+                                    _onBalloonDragUpdate(details, constraints),
+                                onPanEnd: _onBalloonDragEnd,
+                                child:
+                                    const _BalloonWidget(size: Size(50, 60)),
+                              ),
+                            ),
+                        ],
+                      );
+                    }),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(12.0),
+                    color: Colors.white.withOpacity(0.9),
+                    child: Column(
                       children: [
-                        Text(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Text(
+                                'VOLUME: ${_currentVolume.toStringAsFixed(0)} ml',
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold)),
+                            Text(
+                                'PRESSURE: ${_pressure.toStringAsFixed(2)} atm',
+                                style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 12.0,
+                          runSpacing: 8.0,
+                          children: [
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.lock_open),
+                              label: const Text('RELEASE'),
+                              onPressed: _isSealed ? _toggleSeal : null,
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange.shade700,
+                                  foregroundColor: Colors.white),
+                            ),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.lock),
+                              label: const Text('SEAL'),
+                              onPressed: !_isSealed && _balloonInSyringe
+                                  ? _toggleSeal
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green.shade700,
+                                  foregroundColor: Colors.white),
+                            ),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('RESET'),
+                              onPressed: _resetActivity,
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue.shade700,
+                                  foregroundColor: Colors.white),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              Positioned(
+                top: 0,
+                left: MediaQuery.of(context).size.width * 0.05,
+                right: MediaQuery.of(context).size.width * 0.05,
+                child: Material(
+                  color: Colors.transparent,
+                  elevation: 4.0,
+                  child: Container(
+                    padding: const EdgeInsets.all(12.0),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                    child: Text(
                       !_balloonInSyringe
                           ? 'STEP 1: Drag the balloon into the syringe'
                           : !_isSealed
@@ -400,47 +471,15 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
                                   ? 'STEP 3: Balloon at MAX PRESSURE! Cannot compress further.'
                                   : 'STEP 3: Change volume to see Boyle\'s Law',
                       style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                        color: _isAtMaxPressure ? Colors.red.shade700 : Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: _isAtMaxPressure
+                            ? Colors.red.shade700
+                            : Colors.black,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Text('VOLUME: ${_currentVolume.toStringAsFixed(0)} ml', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        Text('PRESSURE: ${_pressure.toStringAsFixed(2)} atm', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 12.0,
-                      runSpacing: 8.0,
-                      children: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.lock_open),
-                          label: const Text('RELEASE'),
-                          onPressed: _isSealed ? _toggleSeal : null,
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange.shade700, foregroundColor: Colors.white),
-                        ),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.lock),
-                          label: const Text('SEAL'),
-                          onPressed: !_isSealed && _balloonInSyringe ? _toggleSeal : null,
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                        ),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('RESET'),
-                          onPressed: _resetActivity,
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700, foregroundColor: Colors.white),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ],
