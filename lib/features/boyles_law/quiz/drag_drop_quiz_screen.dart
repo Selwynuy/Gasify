@@ -20,13 +20,6 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
     6: 'increased',
     7: 'decreased',
     8: 'volume',
-    9: 'pressure',
-    10: 'inversely',
-    11: 'temperature',
-    12: 'pressure',
-    13: 'P1V1 = P2V2',
-    14: 'initial pressure',
-    15: 'final volume',
   };
 
   // User's answers
@@ -43,10 +36,6 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
     'temperature',
     'increased',
     'decreased',
-    'inversely',
-    'P1V1 = P2V2',
-    'initial pressure',
-    'final volume',
   ];
 
   // Words that have been used (for tracking)
@@ -87,7 +76,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
 
     // Play success or fail sound based on score
     final score = _calculateScore();
-    final percentage = (score / 15) * 100;
+    final percentage = (score / 8) * 100;
     if (percentage >= 70) {
       SoundService().playSuccessSound();
     } else {
@@ -107,7 +96,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
 
   int _calculateScore() {
     int correct = 0;
-    for (int i = 1; i <= 15; i++) {
+    for (int i = 1; i <= 8; i++) {
       if (_userAnswers[i]?.trim().toLowerCase() ==
           _correctAnswers[i]?.trim().toLowerCase()) {
         correct++;
@@ -117,7 +106,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
   }
 
   String _getRemarks(int score) {
-    final percentage = (score / 15) * 100;
+    final percentage = (score / 8) * 100;
     if (percentage >= 90) {
       return 'Excellent!';
     } else if (percentage >= 80) {
@@ -135,11 +124,11 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
     if (!_isSubmitted) return Colors.transparent;
     final userAnswer = _userAnswers[blankNumber];
     final correctAnswer = _correctAnswers[blankNumber];
-    if (userAnswer == null) return Colors.orange.withValues(alpha: 0.3);
+    if (userAnswer == null) return Colors.orange.withOpacity(0.3);
     if (userAnswer.trim().toLowerCase() == correctAnswer?.trim().toLowerCase()) {
-      return Colors.green.withValues(alpha: 0.3);
+      return Colors.green.withOpacity(0.3);
     } else {
-      return Colors.red.withValues(alpha: 0.3);
+      return Colors.red.withOpacity(0.3);
     }
   }
 
@@ -169,7 +158,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
                       icon: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
+                          color: Colors.black.withOpacity(0.5),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
@@ -179,7 +168,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: Colors.white.withOpacity(0.9),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
@@ -201,7 +190,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
@@ -258,7 +247,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
                         Center(
                           child: _ResultsWidget(
                             score: score,
-                            total: 15,
+                            total: 8,
                             remarks: remarks,
                             onReset: _onReset,
                           ),
@@ -299,14 +288,14 @@ class _WordBankWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
+        color: Colors.white.withOpacity(0.95),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -328,28 +317,11 @@ class _WordBankWidget extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Column 1: 3 rows
+              // Column 1
               Expanded(
                 child: Column(
                   children: [
-                    for (int i = 0; i < 3; i++)
-                      Padding(
-                        padding: EdgeInsets.only(bottom: i < 2 ? 8 : 0),
-                        child: _DraggableWord(
-                          word: wordBank[i],
-                          isAvailable: !isSubmitted,
-                          usageCount: wordUsageCount[wordBank[i]] ?? 0,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Column 2: 4 rows (center column with last word)
-              Expanded(
-                child: Column(
-                  children: [
-                    for (int i = 3; i < 6; i++)
+                    for (int i = 0; i < 2; i++)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: _DraggableWord(
@@ -358,23 +330,34 @@ class _WordBankWidget extends StatelessWidget {
                           usageCount: wordUsageCount[wordBank[i]] ?? 0,
                         ),
                       ),
-                    // Last word (10th) in center column
-                    _DraggableWord(
-                      word: wordBank[9],
-                      isAvailable: !isSubmitted,
-                      usageCount: wordUsageCount[wordBank[9]] ?? 0,
-                    ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              // Column 3: 3 rows
+              // Column 2
               Expanded(
                 child: Column(
                   children: [
-                    for (int i = 6; i < 9; i++)
+                    for (int i = 2; i < 4; i++)
                       Padding(
-                        padding: EdgeInsets.only(bottom: i < 8 ? 8 : 0),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _DraggableWord(
+                          word: wordBank[i],
+                          isAvailable: !isSubmitted,
+                          usageCount: wordUsageCount[wordBank[i]] ?? 0,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Column 3
+              Expanded(
+                child: Column(
+                  children: [
+                    for (int i = 4; i < 6; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
                         child: _DraggableWord(
                           word: wordBank[i],
                           isAvailable: !isSubmitted,
@@ -417,7 +400,7 @@ class _DraggableWord extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: Colors.black.withOpacity(0.3),
                 blurRadius: 8,
                 offset: const Offset(2, 2),
               ),
@@ -524,7 +507,7 @@ class _FillInBlanksWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Colors.white.withOpacity(0.9),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -543,27 +526,6 @@ class _FillInBlanksWidget extends StatelessWidget {
               " becomes larger.",
             ],
             blanks: [1, 2, 3, 4, 5, 6, 7, 8],
-          ),
-          const SizedBox(height: 20),
-          _buildParagraph(
-            textParts: [
-              "Boyle's experiment proved that the ",
-              " is ",
-              " proportional to the volume of gas at constant ",
-              ", that is the volume decreases with the increasing ",
-              " and vice-versa.",
-            ],
-            blanks: [9, 10, 11, 12],
-          ),
-          const SizedBox(height: 20),
-          _buildParagraph(
-            textParts: [
-              "Mathematically, Boyle's law can be expressed as ",
-              ", where P1 is the ",
-              " and V2 is the ",
-              " of a given gas.",
-            ],
-            blanks: [13, 14, 15],
           ),
         ],
       ),
@@ -747,7 +709,7 @@ class _ResultsWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
+        color: Colors.white.withOpacity(0.95),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.blue.shade300, width: 2),
       ),
