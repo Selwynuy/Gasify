@@ -504,369 +504,457 @@ class _BalloonBottleActivityState extends State<BalloonBottleActivity>
           ),
         ),
         child: SafeArea(
-          child: Column(
+          child: Stack(
             children: [
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return Stack(
-                      children: [
-                        // Table surface
-                        Positioned.fill(
-                          child: Transform.translate(
-                            offset: Offset(0, constraints.maxHeight * 0.4),
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                image: DecorationImage(
-                                  image: AssetImage('assets/charles_law/table.png'),
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        
-                        // Cup (or combined cup with hot water and bottle)
-                        if (_cupPlaced && _cupPosition != null)
-                          Positioned(
-                            left: _cupPosition!.dx - (_bottleInCup && _hotWaterPoured ? 100 : 60), // Center horizontally
-                            top: _cupPosition!.dy - (_bottleInCup && _hotWaterPoured ? 130 : 60), // Moved slightly up when combined
-                            child: _SvgImageWidget(
-                              svgPath: _bottleInCup && _hotWaterPoured
-                                  ? 'assets/charles_law/cup_hot_water_bottle.png'
-                                  : _hotWaterPoured 
-                                      ? 'assets/charles_law/cup_hot_water.png'
-                                      : 'assets/charles_law/cup.png',
-                              icon: Icons.local_drink,
-                              size: _bottleInCup && _hotWaterPoured ? 200 : 120, // Bigger when combined
-                            ),
-                          ),
-
-                        // Hot water steam (shows when hot water is poured, continues even after bottle transfer)
-                        if (_hotWaterPoured && _cupPosition != null)
-                          Positioned(
-                            left: _cupPosition!.dx - 20,
-                            top: _cupPosition!.dy - (_bottleInCup ? 160 : 90), // Adjusted for moved-up combined image (160 when bottle in cup, 90 when just cup with hot water)
-                            child: const _SteamWidget(),
-                          ),
-
-                        // Container
-                        if (_containerPlaced && _containerPosition != null)
-                          Positioned(
-                            left: _containerPosition!.dx - 40,
-                            top: _containerPosition!.dy - 80,
-                            child: _SvgImageWidget(
-                              svgPath: _bottleTransferred && _coldWaterPoured
-                                  ? 'assets/charles_law/container_cold_water_bottle.png'
-                                  : _coldWaterPoured
-                                      ? 'assets/charles_law/container_cold_water.png'
-                                      : 'assets/charles_law/container.png',
-                              icon: Icons.square,
-                              size: 160,
-                            ),
-                          ),
-
-                        // Balloon on bottle (use fixed neck position stored when placed)
-                        if (_balloonOnBottle && _fixedNeckPosition != null)
-                          Builder(
-                            builder: (context) {
-                              // Use stored fixed neck position (updated when bottle is transferred)
-                              final fixedNeckBottomY = _fixedNeckPosition!.dy;
-                              final fixedNeckX = _fixedNeckPosition!.dx;
-                              
-                              // Calculate current widget size
-                              final effectiveSize = _getEffectiveBalloonSize();
-                              // Widget size should match actual balloon size
-                              // Max radius is 33px (diameter 66px) + neck 15px + padding
-                              const baseSize = 50.0; // Base size for neck
-                              // Scale body diameter: volume 1.0 → 60px, volume 1.1 → 66px (10% more)
-                              final bodySize = 60.0 + (effectiveSize - 1.0) * 60.0; // Diameter scales from 60px to 66px
-                              final balloonSize = (baseSize + bodySize).clamp(50.0, 120.0); // Cap appropriately
-                              
-                              // Position widget so its bottom (neck) stays fixed
-                              // Neck is drawn at size.height - 2 in the painter
-                              // So: top + (balloonSize - 2) = fixedNeckBottomY
-                              // Therefore: top = fixedNeckBottomY - balloonSize + 2
-                              // Adjust offset based on whether bottle is transferred (moved up)
-                              final offsetAdjustment = _bottleTransferred ? -15 : 35;
-                              final top = fixedNeckBottomY - balloonSize + offsetAdjustment;
-                              
-                              // Horizontal position: centered on bottle opening (use current size so neck stays centered)
-                              // Neck is always at centerX of widget, so center widget on fixedNeckX
-                              final offsetLeft = _bottleTransferred ? 36 : 0;
-                              final left = fixedNeckX - (balloonSize / 2 - offsetLeft); // Center horizontally based on current size
-                              
-                              return Positioned(
-                                left: left,
-                                top: top,
-                                child: _BalloonPlaceholder(size: effectiveSize),
-                              );
-                            },
-                          ),
-
-                        // Drop zones (only visible when dragging)
-                        // Cup drop zone (centered on table)
-                        if (_currentStep == 0 && _draggingItem != null)
-                          Positioned(
-                            left: screenSize.width / 2 - 100,
-                            top: screenSize.height * 0.4 - 100,
-                            child: _DropZone(
-                              width: 200,
-                              height: 200,
-                              label: 'Place Cup Here',
-                              onAccept: (itemId, position) {
-                                if (itemId == 'cup') {
-                                  _onItemAccepted(itemId, position);
-                                }
-                              },
-                            ),
-                          ),
-
-                        // Hot water drop zone
-                        if (_currentStep == 1 && _cupPlaced && _cupPosition != null && _draggingItem != null)
-                          Positioned(
-                            left: _cupPosition!.dx - 60,
-                            top: _cupPosition!.dy - 60,
-                            child: _DropZone(
-                              width: 120,
-                              height: 120,
-                              label: 'Pour Hot Water',
-                              onAccept: (itemId, position) {
-                                if (itemId == 'hotWater') {
-                                  _onItemAccepted(itemId, _cupPosition!);
-                                }
-                              },
-                            ),
-                          ),
-
-                        // Bottle drop zone (in cup) - centered on cup
-                        if (_currentStep == 2 && _hotWaterPoured && _cupPosition != null && _draggingItem != null)
-                          Positioned(
-                            left: _cupPosition!.dx - 60, // Same as cup position (centered)
-                            top: _cupPosition!.dy - 60, // Same as cup position (centered)
-                            child: _DropZone(
-                              width: 120,
-                              height: 120,
-                              label: 'Place Bottle',
-                              onAccept: (itemId, position) {
-                                if (itemId == 'bottle') {
-                                  _onItemAccepted(itemId, _cupPosition!);
-                                }
-                              },
-                            ),
-                          ),
-
-                        // Balloon drop zone (on bottle)
-                        if (_currentStep == 3 && _bottleInCup && _cupPosition != null && _draggingItem != null)
-                          Positioned(
-                            left: _cupPosition!.dx - 50, // Use cup position since bottle is in cup
-                            top: _cupPosition!.dy - 150, // Above the cup/bottle
-                            child: _DropZone(
-                              width: 100,
-                              height: 100,
-                              label: 'Place Balloon',
-                              onAccept: (itemId, position) {
-                                if (itemId == 'balloon') {
-                                  _onItemAccepted(itemId, _cupPosition!);
-                                }
-                              },
-                            ),
-                          ),
-
-                        // Container drop zone (beside the cup)
-                        if (_currentStep == 4 && _balloonOnBottle && _cupPosition != null && _draggingItem != null)
-                          Positioned(
-                            left: _cupPosition!.dx + 80, // Position to the right of the cup (moved 100px left)
-                            top: _cupPosition!.dy - 100, // Align vertically with cup
-                            child: _DropZone(
-                              width: 100,
-                              height: 100,
-                              label: 'Place Container',
-                              onAccept: (itemId, position) {
-                                if (itemId == 'container') {
-                                  _onItemAccepted(itemId, position);
-                                }
-                              },
-                            ),
-                          ),
-
-                        // Cold water drop zone
-                        if (_currentStep == 5 && _containerPlaced && _containerPosition != null && _draggingItem != null)
-                          Positioned(
-                            left: _containerPosition!.dx - 20,
-                            top: _containerPosition!.dy - 60,
-                            child: _DropZone(
-                              width: 120,
-                              height: 120,
-                              label: 'Pour Cold Water',
-                              onAccept: (itemId, position) {
-                                if (itemId == 'coldWater') {
-                                  _onItemAccepted(itemId, _containerPosition!);
-                                }
-                              },
-                            ),
-                          ),
-
-                        // Transfer bottle button
-                        if (_currentStep == 6 && _containerPlaced && _bottleInCup && _containerPosition != null)
-                          Positioned(
-                            left: _containerPosition!.dx - 80,
-                            top: _containerPosition!.dy + 100,
-                            child: ElevatedButton(
-                              onPressed: () {
-                                // Transfer bottle from cup to container
-                                setState(() {
-                                  _bottlePosition = Offset(_containerPosition!.dx, _containerPosition!.dy - 60);
-                                  _bottleInCup = false;
-                                  _bottleTransferred = true;
-                                  _currentStep = 7;
-                                  // Update balloon's fixed neck position to align with bottle opening in container
-                                  if (_balloonOnBottle && _fixedNeckPosition != null) {
-                                    // Bottle opening in container is at the top of the container image
-                                    // Container image top: _containerPosition!.dy - 80, size: 160
-                                    // Bottle opening is approximately 40px from top of container image
-                                    // Move balloon upward by reducing Y value significantly
-                                    final newNeckBottomY = _containerPosition!.dy - 80 + 40; // Moved up 50px
-                                    final newNeckX = _containerPosition!.dx; // Center of container (bottle opening)
-                                    _fixedNeckPosition = Offset(newNeckX, newNeckBottomY);
-                                  }
-                                });
-                                // Update temperature immediately to adjust balloon size
-                                Future.delayed(const Duration(milliseconds: 300), () {
-                                  _updateTemperatureFromState();
-                                });
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue.shade700,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: const Text(
-                                'Transfer Bottle',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                        // Item showcase panel (right side)
-                        Positioned(
-                          right: 10,
-                          top: 80,
-                          bottom: 200,
-                          width: 60,
-                          child: _ItemShowcasePanel(
-                            items: _items,
-                            draggingItem: _draggingItem,
-                            onDragStart: (itemId) {
-                              setState(() {
-                                _draggingItem = itemId;
-                              });
-                            },
-                            onDragEnd: () {
-                              setState(() {
-                                _draggingItem = null;
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              
-              // Instructions and info panel
-              Container(
-                padding: const EdgeInsets.all(12.0),
-                color: Colors.white.withOpacity(0.95),
+              // Temperature and Volume readouts (upper-left per annotated design)
+              Positioned(
+                left: 16,
+                top: 80,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    SizedBox(
-                      height: 60, // Fixed height to prevent layout shifts
-                      child: Center(
+                    // Vol (top)
+                    if (_balloonOnBottle)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.shade100,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.purple.shade300),
+                        ),
                         child: Text(
-                          _getStepInstruction(),
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: _currentStep == 7 ? Colors.green.shade700 : Colors.blue.shade900,
-                            letterSpacing: 0.5,
+                          'Volume: ${(_currentVolume * 100).toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.purple,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: _getTemperatureColor().withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: _getTemperatureColor(),
-                              width: 2,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _getTemperatureIcon(),
-                                size: 16,
-                                color: _getTemperatureColor(),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${_temperatureCelsius.toStringAsFixed(0)}°C',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: _getTemperatureColor(),
-                                ),
-                              ),
-                            ],
-                          ),
+                    if (_balloonOnBottle) const SizedBox(height: 8),
+                    // Temp (bottom)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _getTemperatureColor().withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: _getTemperatureColor(),
+                          width: 2,
                         ),
-                        // Only show volume indicator when balloon is on the bottle
-                        if (_balloonOnBottle)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.purple.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.purple.shade300),
-                            ),
-                            child: Text(
-                              'Volume: ${(_currentVolume * 100).toStringAsFixed(0)}%',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.purple,
-                              ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getTemperatureIcon(),
+                            size: 16,
+                            color: _getTemperatureColor(),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${_temperatureCelsius.toStringAsFixed(0)}°C',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: _getTemperatureColor(),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('RESET'),
-                      onPressed: _resetExperiment,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange.shade700,
-                        foregroundColor: Colors.white,
+                        ],
                       ),
                     ),
                   ],
                 ),
+              ),
+              Column(
+                children: [
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return Stack(
+                          children: [
+                            // Table surface
+                            Positioned.fill(
+                              child: Transform.translate(
+                                offset:
+                                    Offset(0, constraints.maxHeight * 0.35),
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    image: DecorationImage(
+                                      image: AssetImage(
+                                          'assets/charles_law/table.png'),
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // Cup (or combined cup with hot water and bottle)
+                            if (_cupPlaced && _cupPosition != null)
+                              Positioned(
+                                left: _cupPosition!.dx -
+                                    (_bottleInCup && _hotWaterPoured
+                                        ? 100
+                                        : 60), // Center horizontally
+                                top: _cupPosition!.dy -
+                                    (_bottleInCup && _hotWaterPoured
+                                        ? 130
+                                        : 60), // Moved slightly up when combined
+                                child: _SvgImageWidget(
+                                  svgPath: _bottleInCup && _hotWaterPoured
+                                      ? 'assets/charles_law/cup_hot_water_bottle.png'
+                                      : _hotWaterPoured
+                                          ? 'assets/charles_law/cup_hot_water.png'
+                                          : 'assets/charles_law/cup.png',
+                                  icon: Icons.local_drink,
+                                  size: _bottleInCup && _hotWaterPoured
+                                      ? 200
+                                      : 120, // Bigger when combined
+                                ),
+                              ),
+
+                            // Hot water steam (shows when hot water is poured, continues even after bottle transfer)
+                            if (_hotWaterPoured && _cupPosition != null)
+                              Positioned(
+                                left: _cupPosition!.dx - 20,
+                                top: _cupPosition!.dy -
+                                    (_bottleInCup
+                                        ? 160
+                                        : 90), // Adjusted for moved-up combined image (160 when bottle in cup, 90 when just cup with hot water)
+                                child: const _SteamWidget(),
+                              ),
+
+                            // Container
+                            if (_containerPlaced && _containerPosition != null)
+                              Positioned(
+                                left: _containerPosition!.dx - 40,
+                                top: _containerPosition!.dy - 80,
+                                child: _SvgImageWidget(
+                                  svgPath:
+                                      _bottleTransferred && _coldWaterPoured
+                                          ? 'assets/charles_law/container_cold_water_bottle.png'
+                                          : _coldWaterPoured
+                                              ? 'assets/charles_law/container_cold_water.png'
+                                              : 'assets/charles_law/container.png',
+                                  icon: Icons.square,
+                                  size: 160,
+                                ),
+                              ),
+
+                            // Balloon on bottle (use fixed neck position stored when placed)
+                            if (_balloonOnBottle && _fixedNeckPosition != null)
+                              Builder(
+                                builder: (context) {
+                                  // Use stored fixed neck position (updated when bottle is transferred)
+                                  final fixedNeckBottomY =
+                                      _fixedNeckPosition!.dy;
+                                  final fixedNeckX = _fixedNeckPosition!.dx;
+
+                                  // Calculate current widget size
+                                  final effectiveSize =
+                                      _getEffectiveBalloonSize();
+                                  // Widget size should match actual balloon size
+                                  // Max radius is 33px (diameter 66px) + neck 15px + padding
+                                  const baseSize =
+                                      50.0; // Base size for neck
+                                  // Scale body diameter: volume 1.0 → 60px, volume 1.1 → 66px (10% more)
+                                  final bodySize = 60.0 +
+                                      (effectiveSize - 1.0) *
+                                          60.0; // Diameter scales from 60px to 66px
+                                  final balloonSize = (baseSize + bodySize)
+                                      .clamp(
+                                          50.0, 120.0); // Cap appropriately
+
+                                  // Position widget so its bottom (neck) stays fixed
+                                  // Neck is drawn at size.height - 2 in the painter
+                                  // So: top + (balloonSize - 2) = fixedNeckBottomY
+                                  // Therefore: top = fixedNeckBottomY - balloonSize + 2
+                                  // Adjust offset based on whether bottle is transferred (moved up)
+                                  final offsetAdjustment =
+                                      _bottleTransferred ? -15 : 35;
+                                  final top = fixedNeckBottomY -
+                                      balloonSize +
+                                      offsetAdjustment;
+
+                                  // Horizontal position: centered on bottle opening (use current size so neck stays centered)
+                                  // Neck is always at centerX of widget, so center widget on fixedNeckX
+                                  final offsetLeft =
+                                      _bottleTransferred ? 36 : 0;
+                                  final left = fixedNeckX -
+                                      (balloonSize / 2 -
+                                          offsetLeft); // Center horizontally based on current size
+
+                                  return Positioned(
+                                    left: left,
+                                    top: top,
+                                    child:
+                                        _BalloonPlaceholder(size: effectiveSize),
+                                  );
+                                },
+                              ),
+
+                            // Drop zones (only visible when dragging)
+                            // Cup drop zone (centered on table)
+                            if (_currentStep == 0 && _draggingItem != null)
+                              Positioned(
+                                left: screenSize.width / 2 - 100,
+                                top: screenSize.height * 0.4 - 100,
+                                child: _DropZone(
+                                  width: 200,
+                                  height: 200,
+                                  label: 'Place Cup Here',
+                                  onAccept: (itemId, position) {
+                                    if (itemId == 'cup') {
+                                      _onItemAccepted(itemId, position);
+                                    }
+                                  },
+                                ),
+                              ),
+
+                            // Hot water drop zone
+                            if (_currentStep == 1 &&
+                                _cupPlaced &&
+                                _cupPosition != null &&
+                                _draggingItem != null)
+                              Positioned(
+                                left: _cupPosition!.dx - 60,
+                                top: _cupPosition!.dy - 60,
+                                child: _DropZone(
+                                  width: 120,
+                                  height: 120,
+                                  label: 'Pour Hot Water',
+                                  onAccept: (itemId, position) {
+                                    if (itemId == 'hotWater') {
+                                      _onItemAccepted(itemId, _cupPosition!);
+                                    }
+                                  },
+                                ),
+                              ),
+
+                            // Bottle drop zone (in cup) - centered on cup
+                            if (_currentStep == 2 &&
+                                _hotWaterPoured &&
+                                _cupPosition != null &&
+                                _draggingItem != null)
+                              Positioned(
+                                left: _cupPosition!.dx -
+                                    60, // Same as cup position (centered)
+                                top: _cupPosition!.dy -
+                                    60, // Same as cup position (centered)
+                                child: _DropZone(
+                                  width: 120,
+                                  height: 120,
+                                  label: 'Place Bottle',
+                                  onAccept: (itemId, position) {
+                                    if (itemId == 'bottle') {
+                                      _onItemAccepted(itemId, _cupPosition!);
+                                    }
+                                  },
+                                ),
+                              ),
+
+                            // Balloon drop zone (on bottle)
+                            if (_currentStep == 3 &&
+                                _bottleInCup &&
+                                _cupPosition != null &&
+                                _draggingItem != null)
+                              Positioned(
+                                left: _cupPosition!.dx -
+                                    50, // Use cup position since bottle is in cup
+                                top: _cupPosition!.dy -
+                                    150, // Above the cup/bottle
+                                child: _DropZone(
+                                  width: 100,
+                                  height: 100,
+                                  label: 'Place Balloon',
+                                  onAccept: (itemId, position) {
+                                    if (itemId == 'balloon') {
+                                      _onItemAccepted(itemId, _cupPosition!);
+                                    }
+                                  },
+                                ),
+                              ),
+
+                            // Container drop zone (beside the cup)
+                            if (_currentStep == 4 &&
+                                _balloonOnBottle &&
+                                _cupPosition != null &&
+                                _draggingItem != null)
+                              Positioned(
+                                left: _cupPosition!.dx +
+                                    80, // Position to the right of the cup (moved 100px left)
+                                top: _cupPosition!.dy -
+                                    100, // Align vertically with cup
+                                child: _DropZone(
+                                  width: 100,
+                                  height: 100,
+                                  label: 'Place Container',
+                                  onAccept: (itemId, position) {
+                                    if (itemId == 'container') {
+                                      _onItemAccepted(itemId, position);
+                                    }
+                                  },
+                                ),
+                              ),
+
+                            // Cold water drop zone
+                            if (_currentStep == 5 &&
+                                _containerPlaced &&
+                                _containerPosition != null &&
+                                _draggingItem != null)
+                              Positioned(
+                                left: _containerPosition!.dx - 20,
+                                top: _containerPosition!.dy - 60,
+                                child: _DropZone(
+                                  width: 120,
+                                  height: 120,
+                                  label: 'Pour Cold Water',
+                                  onAccept: (itemId, position) {
+                                    if (itemId == 'coldWater') {
+                                      _onItemAccepted(
+                                          itemId, _containerPosition!);
+                                    }
+                                  },
+                                ),
+                              ),
+
+                            // Transfer bottle button
+                            if (_currentStep == 6 &&
+                                _containerPlaced &&
+                                _bottleInCup &&
+                                _containerPosition != null)
+                              Positioned(
+                                left: _containerPosition!.dx - 80,
+                                top: _containerPosition!.dy + 100,
+                                child: ElevatedButton(
+                                  onPressed: () {
+                                    // Transfer bottle from cup to container
+                                    setState(() {
+                                      _bottlePosition = Offset(
+                                          _containerPosition!.dx,
+                                          _containerPosition!.dy - 60);
+                                      _bottleInCup = false;
+                                      _bottleTransferred = true;
+                                      _currentStep = 7;
+                                      // Update balloon's fixed neck position to align with bottle opening in container
+                                      if (_balloonOnBottle &&
+                                          _fixedNeckPosition != null) {
+                                        // Bottle opening in container is at the top of the container image
+                                        // Container image top: _containerPosition!.dy - 80, size: 160
+                                        // Bottle opening is approximately 40px from top of container image
+                                        // Move balloon upward by reducing Y value significantly
+                                        final newNeckBottomY =
+                                            _containerPosition!.dy -
+                                                80 +
+                                                40; // Moved up 50px
+                                        final newNeckX =
+                                            _containerPosition!.dx; // Center of container (bottle opening)
+                                        _fixedNeckPosition =
+                                            Offset(newNeckX, newNeckBottomY);
+                                      }
+                                    });
+                                    // Update temperature immediately to adjust balloon size
+                                    Future.delayed(
+                                        const Duration(milliseconds: 300), () {
+                                      _updateTemperatureFromState();
+                                    });
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue.shade700,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 24, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Transfer Bottle',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // Item showcase panel (right side)
+                            Positioned(
+                              right: 10,
+                              top: 80,
+                              bottom: 200,
+                              width: 60,
+                              child: _ItemShowcasePanel(
+                                items: _items,
+                                draggingItem: _draggingItem,
+                                onDragStart: (itemId) {
+                                  setState(() {
+                                    _draggingItem = itemId;
+                                  });
+                                },
+                                onDragEnd: () {
+                                  setState(() {
+                                    _draggingItem = null;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                  // Bottom panel: instruction + RESET (fixed height to prevent table shift)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12.0),
+                    color: Colors.white.withOpacity(0.95),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Fixed-height instruction area (prevents layout shift when text wraps)
+                        SizedBox(
+                          height: 52,
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24),
+                              child: Text(
+                                _getStepInstruction(),
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: _currentStep == 7
+                                      ? Colors.green.shade700
+                                      : Colors.blue.shade900,
+                                  letterSpacing: 0.5,
+                                ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('RESET'),
+                          onPressed: _resetExperiment,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
