@@ -22,11 +22,6 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
     8: 'pressure',
     9: 'increases',
     10: 'temperature',
-    11: 'double',
-    12: 'pressure',
-    13: 'V1T1=V2T2',
-    14: 'initial volume',
-    15: 'final temperature',
   };
 
   // User's answers
@@ -38,14 +33,10 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
   // Available words in the word bank
   final List<String> _wordBank = [
     'Jacques Charles',
-    'final temperature',
     'Kelvin',
     'increases',
-    'initial volume',
     'Celsius',
-    'double',
     'Volume',
-    'V1T1=V2T2',
     'decrease',
     'pressure',
     'directly',
@@ -90,7 +81,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
 
     // Play success or fail sound based on score
     final score = _calculateScore();
-    final percentage = (score / 15) * 100;
+    final percentage = (score / 10) * 100;
     if (percentage >= 70) {
       SoundService().playSuccessSound();
     } else {
@@ -110,7 +101,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
 
   int _calculateScore() {
     int correct = 0;
-    for (int i = 1; i <= 15; i++) {
+    for (int i = 1; i <= 10; i++) {
       if (_userAnswers[i]?.trim().toLowerCase() ==
           _correctAnswers[i]?.trim().toLowerCase()) {
         correct++;
@@ -120,7 +111,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
   }
 
   String _getRemarks(int score) {
-    final percentage = (score / 15) * 100;
+    final percentage = (score / 10) * 100;
     if (percentage >= 90) {
       return 'Excellent!';
     } else if (percentage >= 80) {
@@ -138,11 +129,11 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
     if (!_isSubmitted) return Colors.transparent;
     final userAnswer = _userAnswers[blankNumber];
     final correctAnswer = _correctAnswers[blankNumber];
-    if (userAnswer == null) return Colors.orange.withValues(alpha: 0.3);
+    if (userAnswer == null) return Colors.orange.withOpacity(0.3);
     if (userAnswer.trim().toLowerCase() == correctAnswer?.trim().toLowerCase()) {
-      return Colors.green.withValues(alpha: 0.3);
+      return Colors.green.withOpacity(0.3);
     } else {
-      return Colors.red.withValues(alpha: 0.3);
+      return Colors.red.withOpacity(0.3);
     }
   }
 
@@ -172,7 +163,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
                       icon: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
+                          color: Colors.black.withOpacity(0.5),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
@@ -182,7 +173,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: Colors.white.withOpacity(0.9),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
@@ -204,7 +195,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: Colors.white.withOpacity(0.9),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
@@ -261,7 +252,7 @@ class _DragDropQuizScreenState extends State<DragDropQuizScreen> {
                         Center(
                           child: _ResultsWidget(
                             score: score,
-                            total: 15,
+                            total: 10,
                             remarks: remarks,
                             onReset: _onReset,
                           ),
@@ -302,14 +293,14 @@ class _WordBankWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
+        color: Colors.white.withOpacity(0.95),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
+            color: Colors.black.withOpacity(0.2),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -372,7 +363,7 @@ class _DraggableWord extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
+                color: Colors.black.withOpacity(0.3),
                 blurRadius: 8,
                 offset: const Offset(2, 2),
               ),
@@ -479,7 +470,7 @@ class _FillInBlanksWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Colors.white.withOpacity(0.9),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -504,21 +495,9 @@ class _FillInBlanksWidget extends StatelessWidget {
               " of gas at constant ",
               ", that is the volume ",
               " with the increasing ",
-              " and vice versa. So if the absolute temperature is doubled, the volume will also be ",
-              ". This means that at constant ",
-              " the same gas will have a different volume when temperature is changed.",
+              " and vice versa.",
             ],
-            blanks: [5, 6, 7, 8, 9, 10, 11, 12],
-          ),
-          const SizedBox(height: 20),
-          _buildParagraph(
-            textParts: [
-              "Mathematically, Charles' law can be expressed as, ",
-              " when V1 is the ",
-              " and T2 is the ",
-              " of a given gas.",
-            ],
-            blanks: [13, 14, 15],
+            blanks: [5, 6, 7, 8, 9, 10],
           ),
         ],
       ),
@@ -702,7 +681,7 @@ class _ResultsWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
+        color: Colors.white.withOpacity(0.95),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.blue.shade300, width: 2),
       ),

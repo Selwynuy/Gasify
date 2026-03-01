@@ -6,7 +6,9 @@ import '../../../settings/screens/settings_screen.dart';
 import 'widgets/underwater_background.dart';
 import 'widgets/diver_widget.dart';
 import 'widgets/action_buttons.dart';
+import 'widgets/instruction_strip.dart';
 import '../../../../core/services/sound_service.dart';
+import '../../../../core/constants/app_constants.dart';
 
 /// Scuba diving Boyle's Law activity screen.
 /// Context: A recreational diver ascending quickly while holding breath.
@@ -25,6 +27,10 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
   late Animation<double> _depthAnimation;
   double _targetDepth = 10.0;
   bool _showEmergencyWarning = false;
+  bool _showO2CriticalWarning = false;
+  bool _diverDead = false;
+  /// Tracks whether the user has used the DESCEND button (for instruction steps).
+  bool _hasUsedDescend = false;
 
   AnimationController get _warningController {
     _warningFlashController ??= AnimationController(
@@ -59,6 +65,7 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
         setState(() {
           _state.setDepth(_depthAnimation.value);
           _addGraphPoint();
+          _checkO2AndDeath();
         });
       });
 
@@ -88,6 +95,7 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
         setState(() {
           _state.setDepth(_depthAnimation.value);
           _addGraphPoint();
+          _checkO2AndDeath();
         });
       });
     _controller
@@ -106,6 +114,7 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
         setState(() {
           _state.setDepth(_depthAnimation.value);
           _addGraphPoint();
+          _checkO2AndDeath();
         });
       });
     _controller
@@ -114,8 +123,10 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
   }
 
   void _onAscendSlowly() {
+    if (_diverDead) return;
     setState(() {
       _state.consumeOxygen(amount: 0.5);
+      _checkO2AndDeath();
     });
     final newDepth = DivingPhysicsService.ascendDepthStep(_state.depthMeters);
     
@@ -127,8 +138,11 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
   }
 
   void _onDescend() {
+    if (_diverDead) return;
+    _hasUsedDescend = true;
     setState(() {
       _state.consumeOxygen(amount: 0.5);
+      _checkO2AndDeath();
     });
     final newDepth = DivingPhysicsService.descendDepthStep(_state.depthMeters);
     
@@ -140,8 +154,10 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
   }
 
   void _onEmergencyAscent() {
+    if (_diverDead) return;
     setState(() {
       _state.consumeOxygen(amount: 1.0);
+      _checkO2AndDeath();
     });
     final newDepth = DivingPhysicsService.emergencyAscentDepth(_state.depthMeters);
     
@@ -164,10 +180,12 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
   }
 
   void _onExhale() {
+    if (_diverDead) return;
     setState(() {
       _state.exhale(liters: 0.7);
       _state.consumeOxygen(amount: 0.3);
       _addGraphPoint();
+      _checkO2AndDeath();
     });
   }
 
@@ -178,10 +196,79 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
     }
   }
 
+  void _checkO2AndDeath() {
+    if (_diverDead) return;
+    if (_state.oxygenTankPercent <= AppConstants.minOxygenTankPercent &&
+        _state.depthMeters > AppConstants.deathDepthMeters) {
+      _diverDead = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showDeathModal();
+      });
+      return;
+    }
+    _showO2CriticalWarning = _state.oxygenTankPercent <= AppConstants.criticalOxygenPercent &&
+        _state.oxygenTankPercent > AppConstants.minOxygenTankPercent;
+  }
+
+  void _showDeathModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Diver Has Died'),
+        content: const Text(
+          'Oxygen ran out while still deep underwater. '
+          'Always monitor your O2 tank and ascend before it runs empty.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _resetActivity();
+            },
+            child: const Text('Reset & Try Again'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Current instruction step (0–4) derived from user actions and depth.
+  int get _instructionStep {
+    final depth = _state.depthMeters;
+    if (!_hasUsedDescend) return 0;
+    if (depth < 20) return 1;
+    if (depth < 30) return 2;
+    return 3;
+  }
+
+  String _getInstructionText() {
+    switch (_instructionStep) {
+      case 0:
+        return "1. Tap or click and hold the DESCEND button (the large blue circle at the bottom center).";
+      case 1:
+        return "2. Watch the DEPTH box in the top-left corner as the numbers increase.";
+      case 2:
+        return "3. Release the button exactly when the depth reaches 30 m.";
+      case 3:
+        return "4. At 30 m, the parentheses show (4 ATM). Verify on the Pressure-Volume Graph—the orange dot will be at the 4.0 line on the Pressure (atm) axis.";
+      default:
+        return "Follow the steps to complete the activity.";
+    }
+  }
+
   void _resetActivity() {
     _controller.stop();
     _controller.reset();
-    
+    _hasUsedDescend = false;
+    _diverDead = false;
+    _showO2CriticalWarning = false;
+    _warningFlashController?.stop();
+    _warningFlashController?.reset();
     setState(() {
       _state = DivingState(
         depthMeters: 10.0,
@@ -221,13 +308,13 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
     return Scaffold(
       appBar: AppBar(
         title: const Text(""),
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFF003366),
         elevation: 0,
         leading: IconButton(
           icon: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
@@ -241,7 +328,7 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
             icon: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
+                color: Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.settings, color: Colors.white, size: 24),
@@ -258,279 +345,332 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
           const SizedBox(width: 8),
         ],
       ),
-      extendBodyBehindAppBar: true,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF003366),
-              Color(0xFF006699),
-              Color(0xFF001122),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              const UnderwaterBackground(),
-              
-              if (_showEmergencyWarning)
-                Positioned(
-                  top: 180,
-                  right: 12,
-                  child: AnimatedBuilder(
-                    animation: _warningController,
-                    builder: (context, child) {
-                      return Opacity(
-                        opacity: _warningController.value,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red.shade900,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: Colors.yellow,
-                              width: 2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.red.withValues(alpha: 0.8),
-                                blurRadius: 15,
-                                spreadRadius: 3,
-                              ),
-                            ],
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.warning_amber_rounded,
-                                color: Colors.yellow,
-                                size: 24,
-                              ),
-                              SizedBox(width: 8),
-                              Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'EMERGENCY ASCENT!',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    'EXHALE CONTINUOUSLY!',
-                                    style: TextStyle(
-                                      color: Colors.yellow,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              
-              Positioned.fill(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade700.withValues(alpha: 0.8),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'DEPTH: ${_state.depthMeters.toStringAsFixed(0)}m (${_state.pressureAtm.toStringAsFixed(0)} ATM)',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'LUNG VOLUME: ${_state.lungVolumeLiters.toStringAsFixed(1)} L',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Transform.scale(
-                                  scale: 0.85,
-                                  alignment: Alignment.topLeft,
+      extendBodyBehindAppBar: false,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          const UnderwaterBackground(),
+          Positioned.fill(
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                    if (_showEmergencyWarning)
+                          Positioned(
+                            top: 180,
+                            right: 12,
+                            child: AnimatedBuilder(
+                              animation: _warningController,
+                              builder: (context, child) {
+                                return Opacity(
+                                  opacity: _warningController.value,
                                   child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    height: 150,
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade700.withValues(alpha: 0.8),
-                                      borderRadius: BorderRadius.circular(12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
                                     ),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.end,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.shade900,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: Colors.yellow,
+                                        width: 2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.red.withOpacity(0.8),
+                                          blurRadius: 15,
+                                          spreadRadius: 3,
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        Icon(
+                                          Icons.warning_amber_rounded,
+                                          color: Colors.yellow,
+                                          size: 24,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            const Text(
-                                              'O2 TANK',
+                                            Text(
+                                              'EMERGENCY ASCENT!',
                                               style: TextStyle(
                                                 color: Colors.white,
-                                                fontSize: 12,
+                                                fontSize: 14,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                             Text(
-                                              '${_state.oxygenTankPercent.toStringAsFixed(0)}%',
-                                              style: const TextStyle(
-                                                color: Colors.white,
+                                              'EXHALE CONTINUOUSLY!',
+                                              style: TextStyle(
+                                                color: Colors.yellow,
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 35),
-                                        SizedBox(
-                                          height: 35,
-                                          child: _CurvedO2Gauge(
-                                            key: ValueKey(_state.oxygenTankPercent),
-                                            percentage: _state.oxygenTankPercent,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '${_state.oxygenTankPercent.toStringAsFixed(0)}%',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
                                       ],
                                     ),
                                   ),
-                                ),
-                              ],
+                                );
+                              },
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: SizedBox(
-                              height: 150,
-                              child: _PressureVolumeGraph(
-                                points: _graphPoints,
-                                currentVolume: _state.lungVolumeLiters,
-                                currentPressure: _state.pressureAtm,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    Expanded(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          AnimatedBuilder(
-                            animation: _controller,
-                            builder: (context, child) {
-                              final depthOffset = (_state.depthMeters - 10.0) * 2.0;
-                              return Transform.translate(
-                                offset: Offset(0, depthOffset),
-                                child: DiverWidget(
-                                  normalizedLungVolume: normalizedLungVolume,
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12.0, right: 12.0, bottom: 12.0),
+                        Positioned.fill(
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              Flexible(
-                                child: ActionButton(
-                                  label: 'ASCEND SLOWLY',
-                                  onPressed: _onAscendSlowly,
-                                  color: Colors.lightBlue,
+                          InstructionStrip(
+                            text: _getInstructionText(),
+                            isFinalStep: _instructionStep == 3,
+                          ),
+                          Expanded(
+                            child: Column(
+                              children: [
+                              Padding(
+                                padding: const EdgeInsets.all(12.0),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Colors.blue.shade700.withOpacity(0.8),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'DEPTH: ${_state.depthMeters.toStringAsFixed(0)}m (${_state.pressureAtm.toStringAsFixed(0)} ATM)',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                Text(
+                                                  'LUNG VOLUME: ${_state.lungVolumeLiters.toStringAsFixed(1)} L',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          Transform.scale(
+                                            scale: 0.85,
+                                            alignment: Alignment.topLeft,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(12),
+                                              height: 150,
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.shade700.withOpacity(0.8),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Column(
+                                                mainAxisAlignment: MainAxisAlignment.end,
+                                                children: [
+                                                  Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      const Text(
+                                                        'O2 TANK',
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        '${_state.oxygenTankPercent.toStringAsFixed(0)}%',
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 35),
+                                                  SizedBox(
+                                                    height: 35,
+                                                    child: _CurvedO2Gauge(
+                                                      key: ValueKey(_state.oxygenTankPercent),
+                                                      percentage: _state.oxygenTankPercent,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  Text(
+                                                    '${_state.oxygenTankPercent.toStringAsFixed(0)}%',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 14,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          SizedBox(
+                                            height: 150,
+                                            child: _PressureVolumeGraph(
+                                              points: _graphPoints,
+                                              currentVolume: _state.lungVolumeLiters,
+                                              currentPressure: _state.pressureAtm,
+                                            ),
+                                          ),
+                                          if (_showO2CriticalWarning && !_diverDead) ...[
+                                            const SizedBox(height: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 8,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.orange.shade900.withValues(alpha: 0.9),
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(
+                                                  color: Colors.amber,
+                                                  width: 2,
+                                                ),
+                                              ),
+                                              child: const Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.warning_amber_rounded,
+                                                    color: Colors.amber,
+                                                    size: 20,
+                                                  ),
+                                                  SizedBox(width: 6),
+                                                  Flexible(
+                                                    child: Text(
+                                                      'O2 CRITICAL! Ascend soon!',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              Flexible(
-                                child: ActionButton(
-                                  label: 'EXHALE',
-                                  onPressed: _onExhale,
-                                  color: Colors.red,
-                                  isPrimary: true,
-                                ),
-                              ),
-                              Flexible(
-                                child: ActionButton(
-                                  label: 'EMERGENCY ASCENT',
-                                  onPressed: _onEmergencyAscent,
-                                  color: Colors.lightBlue,
-                                  allowHold: false,
+
+                              Expanded(
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    AnimatedBuilder(
+                                      animation: _controller,
+                                      builder: (context, child) {
+                                        final depthOffset = (_state.depthMeters - 10.0) * 2.0;
+                                        return Transform.translate(
+                                          offset: Offset(0, depthOffset),
+                                          child: DiverWidget(
+                                            normalizedLungVolume: normalizedLungVolume,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
-                          ActionButton(
-                            label: 'DESCEND',
-                            onPressed: _onDescend,
-                            color: Colors.blue,
-                            isSecondary: true,
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(left: 12.0, right: 12.0, bottom: 12.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Flexible(
+                        child: ActionButton(
+                          label: 'ASCEND SLOWLY',
+                          onPressed: _onAscendSlowly,
+                          color: Colors.lightBlue,
+                        ),
+                      ),
+                      Flexible(
+                        child: ActionButton(
+                          label: 'EXHALE',
+                          onPressed: _onExhale,
+                          color: Colors.red,
+                          isPrimary: true,
+                        ),
+                      ),
+                      Flexible(
+                        child: ActionButton(
+                          label: 'EMERGENCY ASCENT',
+                          onPressed: _onEmergencyAscent,
+                          color: Colors.lightBlue,
+                          allowHold: false,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ActionButton(
+                    label: 'DESCEND',
+                    onPressed: _onDescend,
+                    color: Colors.blue,
+                    isSecondary: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
+        ),
+      ],
       ),
     );
   }
@@ -655,7 +795,7 @@ class _GraphPainter extends CustomPainter {
 
     const int numGridLines = 5;
     const maxVolume = 10.0;
-    const maxPressure = 5.0;
+    const maxPressure = 8.0;
 
     for (int i = 0; i <= numGridLines; i++) {
       final y = origin.dy - (i * graphHeight / numGridLines);

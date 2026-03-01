@@ -2,7 +2,7 @@
 class AppConstants {
   // Depth limits
   static const double minDepthMeters = 0.0;
-  static const double maxDepthMeters = 40.0;
+  static const double maxDepthMeters = 60.0;
   
   // Lung volume limits
   static const double minLungVolumeLiters = 2.0;
@@ -14,6 +14,8 @@ class AppConstants {
   static const double initialOxygenTankPercent = 100.0;
   static const double minOxygenTankPercent = 0.0;
   static const double maxOxygenTankPercent = 100.0;
+  static const double criticalOxygenPercent = 20.0;
+  static const double deathDepthMeters = 5.0;
   
   // Depth step sizes
   static const double ascendStepMeters = 1.0;
