@@ -31,6 +31,7 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
   bool _showAnswer = false;
   bool _sidebarOpen = false; // Toggle for sidebar
   int _currentStep = 0; // Current instruction step (0-5)
+  bool _instructionsCollapsed = false;
 
   // Boom effect state
   bool _isBooming = false;
@@ -42,6 +43,10 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
   // Warning effect state
   late AnimationController _warningShakeController;
   late Animation<double> _warningShakeAnimation;
+
+  // Step 3 arrow hint (points to Parameters menu)
+  AnimationController? _arrowBounceController;
+  Animation<double>? _arrowBounceAnimation;
 
   // Slider ranges
   static const double _minPressure = 50.0;
@@ -80,6 +85,16 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
         _resetSimulation();
       }
     });
+
+    final arrowController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _arrowBounceController = arrowController;
+    _arrowBounceAnimation = Tween<double>(begin: 0, end: -10).animate(
+      CurvedAnimation(parent: arrowController, curve: Curves.easeInOut),
+    );
+    arrowController.repeat(reverse: true);
     
     _calculateT2();
     
@@ -94,6 +109,7 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
     
     _boomController.dispose();
     _warningShakeController.dispose();
+    _arrowBounceController?.dispose();
     super.dispose();
   }
 
@@ -227,6 +243,19 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
     }
     
     return spots;
+  }
+
+  /// Returns interpretation text for P-V transition based on whether P and V increase or decrease.
+  String _getPVInterpretation() {
+    final bothIncreasing = _p2 > _p1 && _v2 > _v1;
+    final bothDecreasing = _p2 < _p1 && _v2 < _v1;
+    if (bothIncreasing) {
+      return 'When both P and V increase, the PV product rises. Per Combined Gas Law (P₁V₁/T₁ = P₂V₂/T₂), temperature must also increase.';
+    }
+    if (bothDecreasing) {
+      return 'When both P and V decrease, the PV product drops. Per Combined Gas Law, temperature decreases—producing the cooling effect in refrigeration.';
+    }
+    return 'P and V change in opposite directions. Expansion (P↓ V↑) cools; compression (P↑ V↓) heats, per the Combined Gas Law.';
   }
 
   @override
@@ -363,11 +392,12 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
               top: 20,
               child: _buildStateSection(
                 title: "INITIAL STATE",
-                p: _p1,
-                v: _v1,
-                t: _t1Kelvin,
-                tempCelsius: _t1Celsius,
+                p: _showAnswer ? _p1 : 0,
+                v: _showAnswer ? _v1 : 0,
+                t: _showAnswer ? _t1Kelvin : null,
+                tempCelsius: _showAnswer ? _t1Celsius : null,
                 color: Colors.red.shade400,
+                showUnknown: !_showAnswer,
                 isSmallScreen: false,
               ),
             ),
@@ -377,8 +407,8 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
               top: 120,
               child: _buildStateSection(
                 title: "FINAL STATE",
-                p: _p2,
-                v: _v2,
+                p: _showAnswer ? _p2 : 0,
+                v: _showAnswer ? _v2 : 0,
                 t: _showAnswer ? _t2Kelvin : null,
                 tempCelsius: _showAnswer ? _t2Celsius : null,
                 color: Colors.lightBlue.shade400,
@@ -481,6 +511,8 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
                   ),
                 ),
               ),
+            // Step 3 hint: animated arrow pointing to Parameters menu (top-right app bar)
+            if (_currentStep == 2) _buildStep3ArrowHint(),
             // Instructions overlay (bottom)
             Positioned(
               left: 8,
@@ -827,6 +859,17 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
               ),
             ),
           ),
+          SizedBox(height: isSmallScreen ? 4 : 6),
+          Text(
+            _getPVInterpretation(),
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: isSmallScreen ? 6.0 : 8.0,
+              height: 1.2,
+            ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -1006,6 +1049,28 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
     );
   }
 
+  Widget _buildStep3ArrowHint() {
+    final anim = _arrowBounceAnimation;
+    if (anim == null) return const SizedBox.shrink();
+    return Positioned(
+      top: 8,
+      right: 72, // Align with Parameters (tune) icon in app bar
+      child: AnimatedBuilder(
+        animation: anim,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(0, anim.value),
+            child: Icon(
+              Icons.keyboard_arrow_up,
+              size: 40,
+              color: Colors.cyan.shade400,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildInstructions() {
     final instructions = [
       'Observe the Initial State: The refrigerant gas is at high pressure (450 kPa), small volume (0.050 L), and warm temperature (30.0°C) before passing through the expansion valve.',
@@ -1034,114 +1099,139 @@ class _CryoSimActivityState extends State<CryoSimActivity> with TickerProviderSt
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.cyan.shade400, size: 16),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Step-by-Step Instructions',
-                  style: TextStyle(
-                    color: Colors.cyan.shade400,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Text(
-                'Step ${_currentStep + 1} of ${instructions.length}',
-                style: TextStyle(
-                  color: Colors.cyan.shade300,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Current step display
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: Colors.cyan.shade700,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
+          GestureDetector(
+            onTap: () {
+              setState(() => _instructionsCollapsed = !_instructionsCollapsed);
+              SoundService().playTouchSound();
+            },
+            behavior: HitTestBehavior.opaque,
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.cyan.shade400, size: 16),
+                const SizedBox(width: 6),
+                Expanded(
                   child: Text(
-                    '${_currentStep + 1}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
+                    'Step-by-Step Instructions',
+                    style: TextStyle(
+                      color: Colors.cyan.shade400,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  instructions[_currentStep],
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    height: 1.4,
+                Text(
+                  'Step ${_currentStep + 1} of ${instructions.length}',
+                  style: TextStyle(
+                    color: Colors.cyan.shade300,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-              ),
-            ],
+                Icon(
+                  _instructionsCollapsed ? Icons.expand_less : Icons.expand_more,
+                  color: Colors.cyan.shade400,
+                  size: 20,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          // Navigation buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              ElevatedButton.icon(
-                onPressed: _currentStep > 0
-                    ? () {
-                        setState(() {
-                          _currentStep--;
-                        });
-                        SoundService().playTouchSound();
-                      }
-                    : null,
-                icon: const Icon(Icons.arrow_back, size: 12),
-                label: const Text('Previous', style: TextStyle(fontSize: 9)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.cyan.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: _instructionsCollapsed
+                ? const SizedBox.shrink()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 8),
+                      // Current step display
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: Colors.cyan.shade700,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${_currentStep + 1}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              instructions[_currentStep],
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Navigation buttons
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _currentStep > 0
+                                ? () {
+                                    setState(() {
+                                      _currentStep--;
+                                    });
+                                    SoundService().playTouchSound();
+                                  }
+                                : null,
+                            icon: const Icon(Icons.arrow_back, size: 12),
+                            label: const Text('Previous', style: TextStyle(fontSize: 9)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.cyan.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              minimumSize: const Size(0, 0),
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _currentStep < instructions.length - 1
+                                ? () {
+                                    setState(() {
+                                      _currentStep++;
+                                    });
+                                    SoundService().playTouchSound();
+                                  }
+                                : null,
+                            icon: const Icon(Icons.arrow_forward, size: 12),
+                            label: const Text('Next', style: TextStyle(fontSize: 9)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.cyan.shade700,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              minimumSize: const Size(0, 0),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  minimumSize: const Size(0, 0),
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: _currentStep < instructions.length - 1
-                    ? () {
-                        setState(() {
-                          _currentStep++;
-                        });
-                        SoundService().playTouchSound();
-                      }
-                    : null,
-                icon: const Icon(Icons.arrow_forward, size: 12),
-                label: const Text('Next', style: TextStyle(fontSize: 9)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.cyan.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  minimumSize: const Size(0, 0),
-                ),
-              ),
-            ],
           ),
         ],
       ),
