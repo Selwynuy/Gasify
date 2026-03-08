@@ -55,7 +55,8 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
   double _plungerPosition = 0.5;
   
   bool _balloonInSyringe = false;
-  Offset _balloonPosition = const Offset(250, 350);
+  bool _balloonAtBottom = false;
+  Offset _balloonPosition = const Offset(250, 400);
   double _balloonSize = 1.0;
   bool _isAtMaxPressure = false;
   bool _isAnimatingBalloon = false;
@@ -67,6 +68,8 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
 
   static const double _maxBalloonPressure = 3.0;
   static const double _balloonBaseHeight = 60.0;
+  
+  bool get _canSeal => _balloonInSyringe && _balloonAtBottom;
   
   final List<Offset> _graphPoints = [];
 
@@ -175,6 +178,8 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
           _addGraphPoint();
         }
       }
+
+      _updateBalloonBottomState();
     });
   }
 
@@ -241,6 +246,15 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
     }
   }
 
+  void _updateBalloonBottomState() {
+    if (!_balloonInSyringe || _balloonAtBottom) return;
+
+    const double bottomThreshold = 0.15;
+    if (_plungerPosition <= bottomThreshold) {
+      _balloonAtBottom = true;
+    }
+  }
+
   void _onBalloonDragUpdate(DragUpdateDetails details, BoxConstraints constraints) {
     if (_balloonInSyringe) return;
     setState(() {
@@ -259,6 +273,7 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
         (_balloonPosition.dy - syringeOpeningY).abs() < 100) {
       setState(() {
         _balloonInSyringe = true;
+        _balloonAtBottom = false;
         _balloonSize = 1.0;
         _isAnimatingBalloon = false;
         _balloonReleaseController?.reset();
@@ -339,7 +354,8 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
   void _resetActivity() {
     setState(() {
       _balloonInSyringe = false;
-      _balloonPosition = const Offset(250, 350);
+      _balloonAtBottom = false;
+      _balloonPosition = const Offset(250, 400);
       _balloonSize = 1.0;
       _isSealed = false;
       _pressure = 1.0;
@@ -467,7 +483,7 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
                             ElevatedButton.icon(
                               icon: const Icon(Icons.lock),
                               label: const Text('SEAL'),
-                              onPressed: !_isSealed && _balloonInSyringe
+                              onPressed: !_isSealed && _canSeal
                                   ? _toggleSeal
                                   : null,
                               style: ElevatedButton.styleFrom(
@@ -505,11 +521,13 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
                     child: Text(
                       !_balloonInSyringe
                           ? 'STEP 1: Drag the balloon into the syringe'
-                          : !_isSealed
-                              ? 'STEP 2: Adjust volume, then SEAL OPENING'
-                              : _isAtMaxPressure
-                                  ? 'STEP 3: Balloon at MAX PRESSURE! Cannot compress further.'
-                                  : 'STEP 3: Change volume to see Boyle\'s Law',
+                          : (!_isSealed && !_balloonAtBottom)
+                              ? 'STEP 2: Use the plunger to move the balloon to the bottom of the syringe.'
+                              : !_isSealed
+                                  ? 'STEP 3: Now SEAL the opening to trap the gas.'
+                                  : _isAtMaxPressure
+                                      ? 'STEP 4: Balloon at MAX PRESSURE! Cannot compress further.'
+                                      : 'STEP 4: Change volume to see Boyle\'s Law',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -641,7 +659,7 @@ class _VerticalSyringeWidget extends StatelessWidget {
               left: (constraints.maxWidth - innerTubeWidth) / 2,
               width: innerTubeWidth,
               child: Align(
-                alignment: Alignment.center,
+                alignment: isSealed ? Alignment.bottomCenter : Alignment.center,
                 child: LayoutBuilder(
                   builder: (context, balloonConstraints) {
                     const double padding = 2.0;
@@ -650,7 +668,7 @@ class _VerticalSyringeWidget extends StatelessWidget {
                     final double balloonHeight = balloonWidth / 0.833;
                     
                     final double maxHeight = balloonConstraints.maxHeight;
-                    final double clampedHeight = balloonHeight.clamp(30.0, maxHeight);
+                    final double clampedHeight = math.min(math.max(15.0, balloonHeight), maxHeight);
                     final double clampedWidth = clampedHeight * 0.833;
                     
                     return AnimatedSize(
