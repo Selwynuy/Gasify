@@ -3,6 +3,7 @@ import '../activities/syringe_test/syringe_test_activity.dart';
 import '../activities/scuba_diving/scuba_diving_activity.dart';
 import '../quiz/drag_drop_quiz_screen.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../../../shared/screens/think_and_solve_screen.dart';
 
 /// Screen for selecting which Boyle's Law activity to explore.
 class BoylesLawActivitiesScreen extends StatefulWidget {
@@ -143,6 +144,19 @@ class _BoylesLawActivitiesScreenState extends State<BoylesLawActivitiesScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (context) => const DragDropQuizScreen()),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _ActivityButton(
+                            title: "Think and Solve",
+                            icon: Icons.menu_book,
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ThinkAndSolveScreen(law: ThinkAndSolveLaw.boyles),
+                                ),
                               );
                             },
                           ),

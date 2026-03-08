@@ -1,8 +1,8 @@
 /// Application-wide constants
 class AppConstants {
-  // Depth limits
+  // Depth limits (no cap on max; 200m allows descending past 60m)
   static const double minDepthMeters = 0.0;
-  static const double maxDepthMeters = 60.0;
+  static const double maxDepthMeters = 200.0;
   
   // Lung volume limits
   static const double minLungVolumeLiters = 2.0;

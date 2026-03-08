@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/services/sound_service.dart';
+import 'data/rubber_boat_interpretation_data.dart';
 
 /// Rubber Boat Experiment for Charles Law.
 /// Demonstrates: V₁/T₁ = V₂/T₂ (at constant pressure)
@@ -18,9 +19,7 @@ class _RubberBoatActivityState extends State<RubberBoatActivity> {
   double _finalTempC = 45.0; // Start at 45°C to match example
 
   // Volume values (in Liters)
-  // Calculate V₁ to match example: V₂ = 32.3 L at T₂ = 45°C, T₁ = 22°C
-  // V₁ = V₂ × T₁ / T₂ = 32.3 × 295.15 / 318.15 ≈ 29.95 L
-  static const double _initialVolumeL = 30.0; // V₁ (approximately matches example)
+  static const double _initialVolumeL = 30.0; // V₁ (fixed)
   double _finalVolumeL = 30.0; // V₂ (calculated)
   bool _showAnswer = false; // Whether to show the calculated answer
 
@@ -204,15 +203,29 @@ class _RubberBoatActivityState extends State<RubberBoatActivity> {
           ),
         ),
         
-        // Graph at top right - scaled down, non-interactive
+        // Graph at top right with live interpretation strip and reference table button
         Positioned(
           top: 10,
           right: 10,
-          child: IgnorePointer(
-            child: SizedBox(
-              width: 180,
-              height: 140,
-              child: _buildGraph(),
+          child: SizedBox(
+            width: 180,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                IgnorePointer(
+                  child: SizedBox(
+                    width: 180,
+                    height: 140,
+                    child: _buildGraph(),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _LiveInterpretationStrip(
+                  volumeL: _finalVolumeL,
+                  tempK: _celsiusToKelvin(_finalTempC),
+                ),
+              ],
             ),
           ),
         ),
@@ -641,6 +654,62 @@ class _RubberBoatActivityState extends State<RubberBoatActivity> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LiveInterpretationStrip extends StatelessWidget {
+  const _LiveInterpretationStrip({
+    required this.volumeL,
+    required this.tempK,
+  });
+
+  final double volumeL;
+  final double tempK;
+
+  static Color _severityColor(RubberBoatSeverity s) {
+    switch (s) {
+      case RubberBoatSeverity.normal:
+        return Colors.black87;
+      case RubberBoatSeverity.caution:
+        return Colors.amber.shade800;
+      case RubberBoatSeverity.danger:
+        return Colors.orange.shade800;
+      case RubberBoatSeverity.critical:
+        return Colors.red.shade800;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final interp = getInterpretation(volumeL, tempK);
+    final color = _severityColor(interp.severity);
+    final showIcon = interp.severity == RubberBoatSeverity.danger ||
+        interp.severity == RubberBoatSeverity.critical;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (showIcon)
+          Padding(
+            padding: const EdgeInsets.only(right: 4, top: 1),
+            child: Icon(Icons.warning_amber_rounded, size: 12, color: color),
+          ),
+        Expanded(
+          child: Text(
+            interp.message,
+            style: TextStyle(
+              fontSize: 9,
+              color: color,
+              fontWeight: interp.severity == RubberBoatSeverity.critical
+                  ? FontWeight.bold
+                  : null,
+            ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 }

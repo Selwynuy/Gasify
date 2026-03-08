@@ -1,8 +1,30 @@
-# Project Structure
+# Gasify
 
-This document describes the reorganized project structure based on Gas Laws.
+A Flutter mobile app for learning Gas Laws through interactive simulations—Boyle's Law, Charles Law, and the Combined Gas Law.
 
-## Directory Structure
+## Getting Started
+
+### Prerequisites
+
+- Flutter SDK >= 3.0.0
+- Dart >= 3.0.0
+
+### Run
+
+```bash
+flutter pub get
+flutter run
+```
+
+### Build APK
+
+```bash
+flutter build apk
+```
+
+## Project Structure
+
+### Directory Structure
 
 ```
 lib/
@@ -13,6 +35,9 @@ lib/
 ├── core/                              # Core functionality shared across features
 │   ├── constants/
 │   │   └── app_constants.dart         # Application-wide constants
+│   ├── services/
+│   │   ├── sound_service.dart         # Audio playback (just_audio)
+│   │   └── settings_service.dart      # Settings persistence (shared_preferences)
 │   ├── theme/
 │   │   └── app_theme.dart             # Theme configuration
 │   └── utils/
@@ -20,9 +45,9 @@ lib/
 ├── features/                          # Gas Law-based modules
 │   ├── boyles_law/                    # Boyle's Law activities
 │   │   ├── activities/
-│   │   │   ├── syringe_test/         # Syringe Test activity
+│   │   │   ├── syringe_test/          # Syringe Test activity
 │   │   │   │   └── syringe_test_activity.dart
-│   │   │   └── scuba_diving/         # Scuba Diving activity
+│   │   │   └── scuba_diving/          # Scuba Diving activity
 │   │   │       ├── models/
 │   │   │       │   └── diving_state.dart
 │   │   │       ├── services/
@@ -31,6 +56,7 @@ lib/
 │   │   │       │   ├── action_buttons.dart
 │   │   │       │   ├── diver_widget.dart
 │   │   │       │   ├── graph_widgets.dart
+│   │   │       │   ├── instruction_strip.dart
 │   │   │       │   ├── lungs_widget.dart
 │   │   │       │   └── underwater_background.dart
 │   │   │       └── dialogs/
@@ -58,70 +84,77 @@ lib/
 │   │   │       └── true_false_activity.dart
 │   │   └── screens/
 │   │       └── combined_gas_law_activities_screen.dart
-│   ├── settings/                      # Settings feature
+│   ├── settings/
 │   │   └── screens/
 │   │       └── settings_screen.dart
-│   └── start/                         # Start/landing screens
+│   └── start/
 │       └── screens/
 │           ├── start_screen.dart
 │           └── gas_law_selection_screen.dart
 └── shared/                            # Shared across features
-    ├── models/
-    │   └── volume_pressure_point.dart # Shared data models
-    └── widgets/
-        └── volume_pressure_chart.dart  # Shared widgets
+    ├── dialogs/
+    │   └── quiz_unlock_dialog.dart
+    └── services/
+        ├── activity_unlock_service.dart
+        └── quiz_questions.dart
 ```
 
-## Gas Laws Organization
+## Gas Laws
 
-### 1. Boyle's Law
-- **Syringe Test**: Interactive syringe experiment demonstrating pressure-volume relationship
-- **Scuba Diving**: Diving simulation showing Boyle's Law in action
+### 1. Boyle's Law (P∝1/V)
+- **Syringe Test**: Interactive syringe experiment for pressure-volume relationship
+- **Scuba Diving**: Diving simulation with lungs, depth, and pressure-volume graph
 - **Drag and Drop Quiz**: Interactive quiz for Boyle's Law
 
-### 2. Charles Law
-- **Balloon and Bottle Experiment**: Temperature-volume relationship demonstration
-- **Rubber Boat**: Another Charles Law experiment
+### 2. Charles Law (V∝T)
+- **Balloon and Bottle**: Temperature-volume demonstration
+- **Rubber Boat**: Charles Law experiment
 - **Drag and Drop Quiz**: Interactive quiz for Charles Law
 
-### 3. Combined Gas Law
-- **Cryo-sim**: Cryogenic simulation activity
-- **True or False**: True/false quiz activity
+### 3. Combined Gas Law (PV/T = k)
+- **Cryo-sim**: Cryogenic simulation
+- **True or False**: Quiz activity
 
 ## Key Improvements
 
-1. **Law-Based Organization**: Code is organized by gas law (boyles_law, charles_law, combined_gas_law) making it easier to locate and maintain related activities.
+1. **Law-Based Organization**: Code organized by gas law (`boyles_law`, `charles_law`, `combined_gas_law`) for easier maintenance.
 
 2. **Activity Structure**: Each activity has its own directory with:
    - Activity screen file
-   - Activity-specific models, services, widgets, and dialogs (as needed)
+   - Activity-specific models, services, widgets, dialogs (as needed)
 
 3. **Separation of Concerns**:
    - `activities/`: Individual experiment/activity screens
-   - `quiz/`: Quiz screens for each law
+   - `quiz/`: Quiz screens per law
    - `screens/`: Activity selection screens
    - `models/`: Data models (activity-specific)
-   - `services/`: Business logic and calculations (activity-specific)
-   - `widgets/`: Reusable UI components (activity-specific)
-   - `dialogs/`: Dialog widgets (activity-specific)
+   - `services/`: Business logic (activity-specific + core + shared)
+   - `widgets/`: UI components (activity-specific)
+   - `dialogs/`: Dialog widgets (activity-specific + shared)
 
-4. **Core Utilities**: Common functionality (constants, theme, utils) is centralized in the `core/` directory.
+4. **Core**: Constants, theme, utils, sound, and settings in `core/`.
 
-5. **Shared Resources**: Code used across multiple laws is in the `shared/` directory.
+5. **Shared**: Quiz questions, unlock service, and shared dialogs in `shared/`.
 
-6. **Navigation**: Centralized route definitions in `app/routes.dart` for easier navigation management.
+6. **Routes**: Centralized in `app/routes.dart`. Charles Law and Combined Gas Law activities are navigated from their selection screens (not via top-level routes).
 
-## File Naming Conventions
+## Dependencies
+
+- `fl_chart` — Volume vs pressure charts
+- `just_audio` — Audio playback
+- `shared_preferences` — Settings persistence
+- `flutter_svg` — SVG graphics
+
+## File Naming
 
 - Activity screens: `{activity_name}_activity.dart` (e.g., `syringe_test_activity.dart`)
-- Activity selection screens: `{law_name}_activities_screen.dart` (e.g., `boyles_law_activities_screen.dart`)
+- Activity selection: `{law_name}_activities_screen.dart` (e.g., `boyles_law_activities_screen.dart`)
 - Models: `{model_name}.dart` (e.g., `diving_state.dart`)
 - Services: `{service_name}_service.dart` (e.g., `diving_physics_service.dart`)
 
 ## Import Paths
 
-All imports follow the new structure:
-- Activity-specific imports use relative paths within the activity
-- Core imports: `import '../../../core/...'`
-- Shared imports: `import '../../../shared/...'`
-- Cross-law imports: `import '../../other_law/...'`
+- Activity-specific: relative paths within the activity
+- Core: `import '../../../core/...'`
+- Shared: `import '../../../shared/...'`
+- Cross-law: `import '../../other_law/...'`

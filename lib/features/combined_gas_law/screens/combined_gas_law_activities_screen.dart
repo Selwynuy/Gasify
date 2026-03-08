@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../activities/cryo_sim/cryo_sim_activity.dart';
 import '../activities/true_false/true_false_activity.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../../../shared/screens/think_and_solve_screen.dart';
 
 /// Screen for selecting which Combined Gas Law activity to explore.
 class CombinedGasLawActivitiesScreen extends StatefulWidget {
@@ -126,6 +127,19 @@ class _CombinedGasLawActivitiesScreenState extends State<CombinedGasLawActivitie
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (context) => const TrueFalseActivity()),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _ActivityButton(
+                            title: "Think and Solve",
+                            icon: Icons.menu_book,
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ThinkAndSolveScreen(law: ThinkAndSolveLaw.combined),
+                                ),
                               );
                             },
                           ),

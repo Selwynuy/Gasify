@@ -3,6 +3,7 @@ import '../activities/balloon_bottle/balloon_bottle_activity.dart';
 import '../activities/rubber_boat/rubber_boat_activity.dart';
 import '../quiz/drag_drop_quiz_screen.dart';
 import '../../settings/screens/settings_screen.dart';
+import '../../../shared/screens/think_and_solve_screen.dart';
 
 /// Screen for selecting which Charles Law activity to explore.
 class CharlesLawActivitiesScreen extends StatefulWidget {
@@ -138,6 +139,19 @@ class _CharlesLawActivitiesScreenState extends State<CharlesLawActivitiesScreen>
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(builder: (context) => const DragDropQuizScreen()),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _ActivityButton(
+                            title: "Think and Solve",
+                            icon: Icons.menu_book,
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ThinkAndSolveScreen(law: ThinkAndSolveLaw.charles),
+                                ),
                               );
                             },
                           ),

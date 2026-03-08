@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'models/diving_state.dart';
 import 'services/diving_physics_service.dart';
+import 'data/danger_zones_data.dart';
 import '../../../settings/screens/settings_screen.dart';
 import 'widgets/underwater_background.dart';
 import 'widgets/diver_widget.dart';
@@ -155,6 +156,13 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
 
   void _onEmergencyAscent() {
     if (_diverDead) return;
+    if (_state.isLungVolumeUnsafe) {
+      setState(() => _diverDead = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showLungRuptureModal();
+      });
+      return;
+    }
     setState(() {
       _state.consumeOxygen(amount: 1.0);
       _checkO2AndDeath();
@@ -219,6 +227,33 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
         content: const Text(
           'Oxygen ran out while still deep underwater. '
           'Always monitor your O2 tank and ascend before it runs empty.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _resetActivity();
+            },
+            child: const Text('Reset & Try Again'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLungRuptureModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Lung Rupture'),
+        content: const Text(
+          'You ascended too fast without exhaling. Expanding air damaged your lungs '
+          '(pulmonary barotrauma). Always exhale continuously during emergency ascent.',
         ),
         actions: [
           TextButton(
@@ -359,73 +394,6 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                    if (_showEmergencyWarning)
-                          Positioned(
-                            top: 180,
-                            right: 12,
-                            child: AnimatedBuilder(
-                              animation: _warningController,
-                              builder: (context, child) {
-                                return Opacity(
-                                  opacity: _warningController.value,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.shade900,
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: Colors.yellow,
-                                        width: 2,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.red.withOpacity(0.8),
-                                          blurRadius: 15,
-                                          spreadRadius: 3,
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.warning_amber_rounded,
-                                          color: Colors.yellow,
-                                          size: 24,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              'EMERGENCY ASCENT!',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            Text(
-                                              'EXHALE CONTINUOUSLY!',
-                                              style: TextStyle(
-                                                color: Colors.yellow,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
                         Positioned.fill(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -550,6 +518,82 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                                               currentPressure: _state.pressureAtm,
                                             ),
                                           ),
+                                          const SizedBox(height: 6),
+                                          _LiveInterpretationStrip(
+                                            pressureAtm: _state.pressureAtm,
+                                            volumeL: _state.lungVolumeLiters,
+                                          ),
+                                          if (_showEmergencyWarning) ...[
+                                            const SizedBox(height: 6),
+                                            AnimatedBuilder(
+                                              animation: _warningController,
+                                              builder: (context, child) {
+                                                return Opacity(
+                                                  opacity: _warningController.value,
+                                                  child: Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 6,
+                                                    ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.red.shade900,
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(
+                                                        color: Colors.yellow,
+                                                        width: 1.5,
+                                                      ),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: Colors.red.withValues(alpha: 0.8),
+                                                          blurRadius: 8,
+                                                          spreadRadius: 1,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        const Icon(
+                                                          Icons.warning_amber_rounded,
+                                                          color: Colors.yellow,
+                                                          size: 16,
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Flexible(
+                                                          child: Column(
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: const [
+                                                              Text(
+                                                                'EMERGENCY ASCENT!',
+                                                                style: TextStyle(
+                                                                  color: Colors.white,
+                                                                  fontSize: 10,
+                                                                  fontWeight: FontWeight.bold,
+                                                                ),
+                                                                overflow: TextOverflow.ellipsis,
+                                                                maxLines: 1,
+                                                              ),
+                                                              Text(
+                                                                'EXHALE CONTINUOUSLY!',
+                                                                style: TextStyle(
+                                                                  color: Colors.yellow,
+                                                                  fontSize: 9,
+                                                                  fontWeight: FontWeight.bold,
+                                                                ),
+                                                                overflow: TextOverflow.ellipsis,
+                                                                maxLines: 1,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ],
                                           if (_showO2CriticalWarning && !_diverDead) ...[
                                             const SizedBox(height: 8),
                                             Container(
@@ -651,7 +695,7 @@ class _ScubaDivingActivityState extends State<ScubaDivingActivity>
                           label: 'EMERGENCY ASCENT',
                           onPressed: _onEmergencyAscent,
                           color: Colors.lightBlue,
-                          allowHold: false,
+                          allowHold: true,
                         ),
                       ),
                     ],
@@ -740,6 +784,72 @@ class _PressureVolumeGraph extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LiveInterpretationStrip extends StatelessWidget {
+  const _LiveInterpretationStrip({
+    required this.pressureAtm,
+    required this.volumeL,
+  });
+
+  final double pressureAtm;
+  final double volumeL;
+
+  static Color _severityColor(DangerSeverity s) {
+    switch (s) {
+      case DangerSeverity.normal:
+        return Colors.white;
+      case DangerSeverity.caution:
+        return Colors.amber;
+      case DangerSeverity.danger:
+        return Colors.orange;
+      case DangerSeverity.critical:
+        return Colors.red;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final interp = getInterpretation(pressureAtm, volumeL);
+    final color = _severityColor(interp.severity);
+    final showIcon = interp.severity == DangerSeverity.danger ||
+        interp.severity == DangerSeverity.critical;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showIcon)
+              Padding(
+                padding: const EdgeInsets.only(right: 4, top: 1),
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  size: 14,
+                  color: color,
+                ),
+              ),
+            Expanded(
+              child: Text(
+                interp.message,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: color,
+                  fontWeight: interp.severity == DangerSeverity.critical
+                      ? FontWeight.bold
+                      : null,
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
