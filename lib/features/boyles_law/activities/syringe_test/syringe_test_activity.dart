@@ -2,6 +2,46 @@ import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import '../../../../core/services/sound_service.dart';
 
+/// One row of the pressure/volume -> gas description lookup table.
+class _GasDescriptionRow {
+  final double pMin;
+  final double pMax;
+  final double vMin;
+  final double vMax;
+  final String description;
+  const _GasDescriptionRow(this.pMin, this.pMax, this.vMin, this.vMax, this.description);
+}
+
+// Volume ranges use overlapping boundaries so continuous values (e.g. 23.7, 29.5) always match; first match wins.
+const List<_GasDescriptionRow> _gasDescriptionTable = [
+  _GasDescriptionRow(0.0, 1.1, 0, 1.5, 'It is impossible to have almost no pressure while the gas is squeezed into nearly zero space.'),
+  _GasDescriptionRow(0.0, 1.1, 1.5, 12.5, 'The gas is under low pressure with little room to move.'),
+  _GasDescriptionRow(0.0, 1.1, 12.5, 24.5, 'The gas is under low pressure and has a decent amount of room to move'),
+  _GasDescriptionRow(0.0, 1.1, 24.5, 36.5, 'This is the natural state of the gas. The gas is relaxed.'),
+  _GasDescriptionRow(0.0, 1.1, 36.5, 48.5, 'The plunger is pulled out, giving particles lots of room; pressure drops as a result.'),
+  _GasDescriptionRow(0.0, 1.1, 48.5, 59.5, 'The gas is spread very thin. The internal pressure is at its lowest point.'),
+  _GasDescriptionRow(0.0, 1.1, 59.5, 60.5, 'The gas fills the entire syringe. Particles are very far apart.'),
+  _GasDescriptionRow(1.2, 2.3, 12.5, 24.5, 'You are actively pushing the plunger. Particles are bumping into walls more often.'),
+  _GasDescriptionRow(1.2, 2.3, 24.5, 36.5, 'The gas is beginning to resist the push as the space gets smaller.'),
+  _GasDescriptionRow(1.2, 2.3, 48.5, 60.5, 'You cannot have high volume and medium pressure at the same time in a closed syringe.'),
+  _GasDescriptionRow(2.4, 3.5, 0, 1.5, 'You are trying to vanish the gas! The pressure would actually be much higher than 3.5 atm here.'),
+  _GasDescriptionRow(2.4, 3.5, 12.5, 24.5, 'The gas is tightly packed. The red balloon in the syringe would be noticeably smaller.'),
+  _GasDescriptionRow(2.4, 3.5, 36.5, 60.5, 'Gas cannot stay at high pressure if you give it more room to expand.'),
+  _GasDescriptionRow(3.6, 4.7, 0, 12.5, 'The particles are slamming into the walls. The gas is pushing back very hard.'),
+  _GasDescriptionRow(3.6, 4.7, 12.5, 24.5, 'This requires significant physical force to hold the plunger in place.'),
+  _GasDescriptionRow(4.8, 6.0, 0, 1.5, 'The gas is squeezed so hard it is nearly solid. Pressure would be off the charts.'),
+  _GasDescriptionRow(4.8, 6.0, 1.5, 12.5, 'The gas is at its densest. The particles have very little "wiggle room."'),
+];
+
+String _getGasDescription(double pressure, double volume) {
+  for (final row in _gasDescriptionTable) {
+    if (pressure >= row.pMin && pressure <= row.pMax && volume >= row.vMin && volume <= row.vMax) {
+      return row.description;
+    }
+  }
+  return 'Seal the syringe and move the plunger to see how the gas state changes.';
+}
+
 class SyringeTestActivity extends StatefulWidget {
   const SyringeTestActivity({super.key});
 
@@ -361,7 +401,7 @@ class _SyringeTestActivityState extends State<SyringeTestActivity> with SingleTi
                             top: 80, // Adjusted top position for the graph
                             right: 20,
                             width: constraints.maxWidth - 180,
-                            height: 250,
+                            height: 300,
                             child: RepaintBoundary(
                               child: _PressureVolumeGraph(
                                 points: _graphPoints,
@@ -1257,9 +1297,16 @@ class _PressureVolumeGraph extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-              Text(
+          Text(
             'Volume (ml)',
             style: TextStyle(fontSize: 11, color: Colors.grey.shade800, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _getGasDescription(currentPressure, currentVolume),
+            style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
